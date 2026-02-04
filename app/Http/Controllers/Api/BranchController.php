@@ -28,6 +28,22 @@ class BranchController extends Controller
         $query->orderBy($sortBy, $sortDirection);
 
         $perPage = $request->per_page ?? 10;
+
+        if ($perPage == -1) {
+            $branches = $query->get();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $branches,
+                'meta' => [
+                    'current_page' => 1,
+                    'per_page' => $branches->count(),
+                    'total' => $branches->count(),
+                    'last_page' => 1,
+                ],
+            ]);
+        }
+
         $branches = $query->paginate($perPage);
 
         return response()->json([

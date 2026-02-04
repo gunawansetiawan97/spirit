@@ -12,6 +12,8 @@ import RoleForm from '@/Pages/Master/Role/Form.vue';
 import RolePermission from '@/Pages/Master/Role/Permission.vue';
 import UserIndex from '@/Pages/Master/User/Index.vue';
 import UserForm from '@/Pages/Master/User/Form.vue';
+import BranchIndex from '@/Pages/Master/Branch/Index.vue';
+import BranchForm from '@/Pages/Master/Branch/Form.vue';
 
 const authStore = useAuthStore();
 const uiStore = useUiStore();
@@ -41,6 +43,10 @@ const routePatterns: RouteConfig[] = [
     { pattern: /^\/master\/user\/create$/, component: UserForm, getProps: () => ({ mode: 'create' }) },
     { pattern: new RegExp(`^/master/user/(${UUID_PATTERN})$`), component: UserForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
     { pattern: new RegExp(`^/master/user/(${UUID_PATTERN})/edit$`), component: UserForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
+    { pattern: /^\/master\/branch$/, component: BranchIndex },
+    { pattern: /^\/master\/branch\/create$/, component: BranchForm, getProps: () => ({ mode: 'create' }) },
+    { pattern: new RegExp(`^/master/branch/(${UUID_PATTERN})$`), component: BranchForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
+    { pattern: new RegExp(`^/master/branch/(${UUID_PATTERN})/edit$`), component: BranchForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
 ];
 
 const matchRoute = (path: string): { component: any; props: Record<string, any> } => {
