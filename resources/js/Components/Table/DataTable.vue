@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import TablePagination from './TablePagination.vue';
-import type { TableColumn, SortConfig } from '@/types';
+import ActionButtons from './ActionButtons.vue';
+import type { TableColumn, SortConfig, ActionConfig } from '@/types';
 
 interface Props {
     columns: TableColumn[];
@@ -25,6 +26,8 @@ interface Props {
     searchValue?: string;
     // Empty state
     emptyText?: string;
+    // Actions
+    actions?: ActionConfig[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -41,6 +44,7 @@ const props = withDefaults(defineProps<Props>(), {
     searchPlaceholder: 'Cari...',
     searchValue: '',
     emptyText: 'Tidak ada data',
+    actions: () => [],
 });
 
 const emit = defineEmits<{
@@ -51,7 +55,16 @@ const emit = defineEmits<{
     (e: 'search', value: string): void;
     (e: 'sort', value: SortConfig): void;
     (e: 'row-click', row: any): void;
+    (e: 'action-view', row: any): void;
+    (e: 'action-edit', row: any): void;
+    (e: 'action-delete', row: any): void;
+    (e: 'action-permissions', row: any): void;
+    (e: 'action-custom', row: any, action: ActionConfig): void;
 }>();
+
+const hasActions = computed(() => props.actions.length > 0 || !!slots.actions);
+
+const slots = defineSlots();
 
 const localSearch = ref(props.searchValue);
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -223,7 +236,7 @@ const getAlignClass = (align?: string) => {
                             </div>
                         </th>
                         <!-- Actions column -->
-                        <th v-if="$slots.actions" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600">
+                        <th v-if="hasActions" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600">
                             Aksi
                         </th>
                     </tr>
@@ -231,7 +244,7 @@ const getAlignClass = (align?: string) => {
                 <tbody class="divide-y divide-gray-200 bg-white">
                     <!-- Loading state -->
                     <tr v-if="loading">
-                        <td :colspan="columns.length + (selectable ? 1 : 0) + ($slots.actions ? 1 : 0)" class="px-4 py-12 text-center">
+                        <td :colspan="columns.length + (selectable ? 1 : 0) + (hasActions ? 1 : 0)" class="px-4 py-12 text-center">
                             <div class="flex items-center justify-center">
                                 <svg class="h-8 w-8 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -243,7 +256,7 @@ const getAlignClass = (align?: string) => {
                     </tr>
                     <!-- Empty state -->
                     <tr v-else-if="data.length === 0">
-                        <td :colspan="columns.length + (selectable ? 1 : 0) + ($slots.actions ? 1 : 0)" class="px-4 py-12 text-center">
+                        <td :colspan="columns.length + (selectable ? 1 : 0) + (hasActions ? 1 : 0)" class="px-4 py-12 text-center">
                             <div class="flex flex-col items-center">
                                 <svg class="h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -282,8 +295,19 @@ const getAlignClass = (align?: string) => {
                             </slot>
                         </td>
                         <!-- Actions -->
-                        <td v-if="$slots.actions" class="whitespace-nowrap px-4 py-3 text-right text-sm" @click.stop>
-                            <slot name="actions" :row="row" :index="index" />
+                        <td v-if="hasActions" class="whitespace-nowrap px-4 py-3 text-right text-sm" @click.stop>
+                            <slot name="actions" :row="row" :index="index">
+                                <ActionButtons
+                                    v-if="actions.length > 0"
+                                    :row="row"
+                                    :actions="actions"
+                                    @view="emit('action-view', $event)"
+                                    @edit="emit('action-edit', $event)"
+                                    @delete="emit('action-delete', $event)"
+                                    @permissions="emit('action-permissions', $event)"
+                                    @custom="emit('action-custom', $event, $event)"
+                                />
+                            </slot>
                         </td>
                     </tr>
                 </tbody>

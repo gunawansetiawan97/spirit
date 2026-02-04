@@ -63,6 +63,20 @@ export interface ConfirmDialogConfig {
     variant?: 'info' | 'warning' | 'danger';
 }
 
+// Action Button Types
+export type ActionType = 'view' | 'edit' | 'delete' | 'permissions' | 'custom';
+
+export interface ActionConfig {
+    type: ActionType;
+    permission?: string;
+    action?: string;
+    label?: string;
+    icon?: string;
+    color?: string;
+    show?: (row: any) => boolean;
+    onClick?: (row: any) => void;
+}
+
 // API Response Types
 export interface ApiResponse<T = any> {
     data: T;
