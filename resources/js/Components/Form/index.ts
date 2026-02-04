@@ -7,3 +7,4 @@ export { default as BaseDatePicker } from './BaseDatePicker.vue';
 export { default as BaseButton } from './BaseButton.vue';
 export { default as FormGroup } from './FormGroup.vue';
 export { default as FormPage } from './FormPage.vue';
+export { default as BaseBrowse } from './BaseBrowse.vue';

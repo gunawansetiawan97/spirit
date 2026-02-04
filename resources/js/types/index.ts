@@ -124,6 +124,31 @@ export interface ExportInfo {
     filters?: { label: string; value: string }[];
 }
 
+// Browse Types
+export interface BrowseColumn {
+    key: string;
+    label: string;
+    width?: string;
+    align?: 'left' | 'center' | 'right';
+    formatter?: (value: any, row: any) => string;
+}
+
+export interface BrowseConfig {
+    endpoint: string;
+    title: string;
+    columns: BrowseColumn[];
+    valueKey?: string;
+    displayFormat: string | ((row: any) => string);
+    /** Format for autocomplete dropdown items (same syntax as displayFormat) */
+    dropdownFormat?: string | ((row: any) => string);
+    showEndpoint?: string;
+    /** Route to navigate for creating a new record (shows + button) */
+    createRoute?: string;
+    modalSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+    perPage?: number;
+    searchPlaceholder?: string;
+}
+
 // API Response Types
 export interface ApiResponse<T = any> {
     data: T;
