@@ -1,9 +1,9 @@
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 import axios from 'axios';
 import { useUiStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
 import { exportToExcel, exportToPdf } from '@/utils/exportUtils';
-import type { TableColumn, ActionConfig, CreateButtonConfig, DeleteDialogConfig, FilterField, ExportConfig } from '@/types';
+import type { TableColumn, ActionConfig, CreateButtonConfig, DeleteDialogConfig, FilterField, ExportConfig, ExportInfo } from '@/types';
 
 export interface IndexPageConfig {
     // Entity info
@@ -63,20 +63,49 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
         } : undefined
     );
 
-    // Table state
+    // Session storage key per page
+    const sessionKey = `index_state_${basePath}`;
+
+    const loadSessionState = () => {
+        try {
+            const saved = sessionStorage.getItem(sessionKey);
+            if (saved) return JSON.parse(saved);
+        } catch { /* ignore */ }
+        return null;
+    };
+
+    const savedState = loadSessionState();
+
+    // Table state (restore from session if available)
     const data = ref<any[]>([]);
     const loading = ref(false);
-    const currentPage = ref(1);
-    const perPage = ref(10);
+    const currentPage = ref(savedState?.currentPage ?? 1);
+    const perPage = ref(savedState?.perPage ?? 10);
     const total = ref(0);
-    const search = ref('');
+    const search = ref(savedState?.search ?? '');
     const isDeleting = ref(false);
     const isExporting = ref(false);
 
-    // Filter state
+    // Filter state (restore from session if available)
+    const defaultFilterValues = filters.reduce((acc, field) => ({ ...acc, [field.key]: '' }), {} as Record<string, any>);
     const filterValues = reactive<Record<string, any>>(
-        filters.reduce((acc, field) => ({ ...acc, [field.key]: '' }), {})
+        savedState?.filterValues ? { ...defaultFilterValues, ...savedState.filterValues } : defaultFilterValues
     );
+
+    // Save state to session whenever it changes
+    const saveSessionState = () => {
+        try {
+            sessionStorage.setItem(sessionKey, JSON.stringify({
+                search: search.value,
+                currentPage: currentPage.value,
+                perPage: perPage.value,
+                filterValues: { ...filterValues },
+            }));
+        } catch { /* ignore */ }
+    };
+
+    watch([search, currentPage, perPage], saveSessionState);
+    watch(() => ({ ...filterValues }), saveSessionState, { deep: true });
 
     // Default actions based on entityName
     const defaultActions = computed<ActionConfig[]>(() => [
@@ -168,6 +197,31 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
         Object.assign(filterValues, values);
     };
 
+    // Build export info from active search/filters
+    const buildExportInfo = (): ExportInfo => {
+        const info: ExportInfo = {};
+        if (search.value) {
+            info.search = search.value;
+        }
+        const activeFilters: { label: string; value: string }[] = [];
+        for (const field of filters) {
+            const val = filterValues[field.key];
+            if (val !== '' && val != null) {
+                let displayValue = String(val);
+                // Resolve select option label
+                if (field.type === 'select' && field.options) {
+                    const option = field.options.find(o => String(o.value) === String(val));
+                    if (option) displayValue = option.label;
+                }
+                activeFilters.push({ label: field.label, value: displayValue });
+            }
+        }
+        if (activeFilters.length > 0) {
+            info.filters = activeFilters;
+        }
+        return info;
+    };
+
     // Export handlers
     const handleExportExcel = async () => {
         isExporting.value = true;
@@ -181,7 +235,9 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
             });
             const allData = response.data.data;
             const filename = exportConfig?.filename || entityName;
-            exportToExcel(allData, columns, filename);
+            const pdfTitle = exportConfig?.title || title;
+            const info = buildExportInfo();
+            exportToExcel(allData, columns, filename, pdfTitle, info);
         } catch (error) {
             console.error(`Failed to export ${entityName}s to Excel:`, error);
         } finally {
@@ -202,7 +258,8 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
             const allData = response.data.data;
             const filename = exportConfig?.filename || entityName;
             const pdfTitle = exportConfig?.title || title;
-            exportToPdf(allData, columns, filename, pdfTitle);
+            const info = buildExportInfo();
+            exportToPdf(allData, columns, filename, pdfTitle, info);
         } catch (error) {
             console.error(`Failed to export ${entityName}s to PDF:`, error);
         } finally {
