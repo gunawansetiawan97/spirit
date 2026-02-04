@@ -68,9 +68,19 @@ const currentPageProps = computed(() => {
     return props;
 });
 
+// Check if route is a detail page (create/view/edit) vs index page
+const isDetailRoute = (route: string): boolean => {
+    return /\/(create|edit|permissions)$/.test(route) ||
+        /\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/.test(route);
+};
+
 const handleNavigate = (route: string) => {
-    currentRoute.value = route;
-    window.history.pushState({}, '', route);
+    if (isDetailRoute(route)) {
+        window.open(route, '_blank');
+    } else {
+        currentRoute.value = route;
+        window.history.pushState({}, '', route);
+    }
 };
 
 const handleAction = (action: string) => {
