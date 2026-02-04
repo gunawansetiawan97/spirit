@@ -119,6 +119,11 @@ export interface ExportConfig {
     permission?: string;
 }
 
+export interface ExportInfo {
+    search?: string;
+    filters?: { label: string; value: string }[];
+}
+
 // API Response Types
 export interface ApiResponse<T = any> {
     data: T;

@@ -53,7 +53,7 @@ const handleEdit = () => {
 <template>
     <div class="min-h-screen bg-gray-50 py-6">
         <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-            <!-- Header -->
+            <!-- Header with action buttons -->
             <div class="mb-6 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <button
@@ -69,6 +69,40 @@ const handleEdit = () => {
                 </div>
                 <div class="flex items-center gap-2">
                     <slot name="header-actions" />
+
+                    <BaseButton
+                        type="button"
+                        variant="secondary"
+                        @click="handleBack"
+                    >
+                        {{ isReadonly ? 'Kembali' : 'Batal' }}
+                    </BaseButton>
+
+                    <BaseButton
+                        v-if="showEdit"
+                        type="button"
+                        variant="primary"
+                        @click="handleEdit"
+                    >
+                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit
+                    </BaseButton>
+
+                    <BaseButton
+                        v-if="showSubmit"
+                        type="submit"
+                        form="form-page"
+                        variant="primary"
+                        :loading="saving"
+                        :disabled="saving"
+                    >
+                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        {{ mode === 'create' ? 'Simpan' : 'Update' }}
+                    </BaseButton>
                 </div>
             </div>
 
@@ -82,47 +116,9 @@ const handleEdit = () => {
             </div>
 
             <!-- Form content -->
-            <form v-else @submit.prevent="handleSubmit">
-                <div class="rounded-lg bg-white shadow">
-                    <div class="p-6">
-                        <slot :readonly="isReadonly" :mode="mode" />
-                    </div>
-
-                    <!-- Footer actions -->
-                    <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-                        <BaseButton
-                            type="button"
-                            variant="secondary"
-                            @click="handleBack"
-                        >
-                            {{ isReadonly ? 'Kembali' : 'Batal' }}
-                        </BaseButton>
-
-                        <BaseButton
-                            v-if="showEdit"
-                            type="button"
-                            variant="primary"
-                            @click="handleEdit"
-                        >
-                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Edit
-                        </BaseButton>
-
-                        <BaseButton
-                            v-if="showSubmit"
-                            type="submit"
-                            variant="primary"
-                            :loading="saving"
-                            :disabled="saving"
-                        >
-                            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                            {{ mode === 'create' ? 'Simpan' : 'Update' }}
-                        </BaseButton>
-                    </div>
+            <form v-else id="form-page" @submit.prevent="handleSubmit">
+                <div class="rounded-lg bg-white p-6 shadow">
+                    <slot :readonly="isReadonly" :mode="mode" />
                 </div>
             </form>
         </div>
