@@ -103,6 +103,22 @@ export interface DeleteDialogConfig {
     itemLabel?: string;
 }
 
+// Filter Types
+export interface FilterField {
+    key: string;
+    label: string;
+    type: 'text' | 'select' | 'date';
+    options?: SelectOption[];
+    placeholder?: string;
+}
+
+// Export Types
+export interface ExportConfig {
+    filename: string;
+    title?: string;
+    permission?: string;
+}
+
 // API Response Types
 export interface ApiResponse<T = any> {
     data: T;

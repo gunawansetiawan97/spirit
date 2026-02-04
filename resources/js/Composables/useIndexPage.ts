@@ -1,8 +1,9 @@
-import { ref, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useUiStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
-import type { TableColumn, ActionConfig, CreateButtonConfig, DeleteDialogConfig } from '@/types';
+import { exportToExcel, exportToPdf } from '@/utils/exportUtils';
+import type { TableColumn, ActionConfig, CreateButtonConfig, DeleteDialogConfig, FilterField, ExportConfig } from '@/types';
 
 export interface IndexPageConfig {
     // Entity info
@@ -21,6 +22,12 @@ export interface IndexPageConfig {
 
     // Actions (optional - defaults based on entityName)
     actions?: ActionConfig[];
+
+    // Filters
+    filters?: FilterField[];
+
+    // Export
+    exportConfig?: ExportConfig;
 
     // Search
     searchPlaceholder?: string;
@@ -42,9 +49,19 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
         apiEndpoint,
         basePath,
         columns,
+        filters = [],
         searchPlaceholder = `Cari ${entityLabel}...`,
         permissionPrefix = `master.${entityName}`,
     } = config;
+
+    // Export config with defaults
+    const exportConfig: ExportConfig | undefined = config.exportConfig ?? (
+        permissionPrefix ? {
+            filename: entityName,
+            title: title,
+            permission: permissionPrefix,
+        } : undefined
+    );
 
     // Table state
     const data = ref<any[]>([]);
@@ -54,6 +71,12 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
     const total = ref(0);
     const search = ref('');
     const isDeleting = ref(false);
+    const isExporting = ref(false);
+
+    // Filter state
+    const filterValues = reactive<Record<string, any>>(
+        filters.reduce((acc, field) => ({ ...acc, [field.key]: '' }), {})
+    );
 
     // Default actions based on entityName
     const defaultActions = computed<ActionConfig[]>(() => [
@@ -77,6 +100,17 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
         message: (row) => `Apakah Anda yakin ingin menghapus ${entityLabel} '${row.name}'?`,
     };
 
+    // Build filter params (exclude empty values)
+    const getFilterParams = (): Record<string, any> => {
+        const params: Record<string, any> = {};
+        for (const key in filterValues) {
+            if (filterValues[key] !== '' && filterValues[key] != null) {
+                params[key] = filterValues[key];
+            }
+        }
+        return params;
+    };
+
     // Fetch data
     const fetchData = async () => {
         loading.value = true;
@@ -86,6 +120,7 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
                     page: currentPage.value,
                     per_page: perPage.value,
                     search: search.value,
+                    ...getFilterParams(),
                 },
             });
             data.value = response.data.data;
@@ -113,6 +148,66 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
         perPage.value = value;
         currentPage.value = 1;
         fetchData();
+    };
+
+    // Filter handlers
+    const handleFilter = () => {
+        currentPage.value = 1;
+        fetchData();
+    };
+
+    const handleFilterReset = () => {
+        for (const key in filterValues) {
+            filterValues[key] = '';
+        }
+        currentPage.value = 1;
+        fetchData();
+    };
+
+    const handleFilterUpdate = (values: Record<string, any>) => {
+        Object.assign(filterValues, values);
+    };
+
+    // Export handlers
+    const handleExportExcel = async () => {
+        isExporting.value = true;
+        try {
+            const response = await axios.get(apiEndpoint, {
+                params: {
+                    per_page: -1,
+                    search: search.value,
+                    ...getFilterParams(),
+                },
+            });
+            const allData = response.data.data;
+            const filename = exportConfig?.filename || entityName;
+            exportToExcel(allData, columns, filename);
+        } catch (error) {
+            console.error(`Failed to export ${entityName}s to Excel:`, error);
+        } finally {
+            isExporting.value = false;
+        }
+    };
+
+    const handleExportPdf = async () => {
+        isExporting.value = true;
+        try {
+            const response = await axios.get(apiEndpoint, {
+                params: {
+                    per_page: -1,
+                    search: search.value,
+                    ...getFilterParams(),
+                },
+            });
+            const allData = response.data.data;
+            const filename = exportConfig?.filename || entityName;
+            const pdfTitle = exportConfig?.title || title;
+            exportToPdf(allData, columns, filename, pdfTitle);
+        } catch (error) {
+            console.error(`Failed to export ${entityName}s to PDF:`, error);
+        } finally {
+            isExporting.value = false;
+        }
     };
 
     // Navigation
@@ -157,6 +252,8 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
         total,
         search,
         isDeleting,
+        isExporting,
+        filterValues,
 
         // Config
         columns,
@@ -164,6 +261,8 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
         createButton,
         deleteDialog,
         searchPlaceholder,
+        filters,
+        exportConfig,
 
         // Methods
         fetchData,
@@ -174,5 +273,10 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
         navigateToView,
         navigateToEdit,
         handleDelete,
+        handleFilter,
+        handleFilterReset,
+        handleFilterUpdate,
+        handleExportExcel,
+        handleExportPdf,
     };
 }

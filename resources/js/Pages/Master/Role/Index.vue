@@ -15,16 +15,25 @@ const {
     total,
     search,
     isDeleting,
+    isExporting,
+    filterValues,
     columns,
     createButton,
     deleteDialog,
     searchPlaceholder,
+    filters,
+    exportConfig,
     fetchData,
     handleSearch,
     navigateToCreate,
     navigateToView,
     navigateToEdit,
     handleDelete,
+    handleFilter,
+    handleFilterReset,
+    handleFilterUpdate,
+    handleExportExcel,
+    handleExportPdf,
 } = useIndexPage({
     title: 'Master Role',
     entityName: 'role',
@@ -36,6 +45,13 @@ const {
         { key: 'description', label: 'Deskripsi' },
         { key: 'users_count', label: 'Jumlah User', width: '120px', align: 'center' },
         { key: 'is_active', label: 'Status', width: '100px', align: 'center', type: 'status' },
+    ],
+    filters: [
+        { key: 'is_active', label: 'Status', type: 'select', options: [
+            { value: '', label: 'Semua' },
+            { value: '1', label: 'Aktif' },
+            { value: '0', label: 'Nonaktif' },
+        ]},
     ],
 }, emit);
 
@@ -70,9 +86,18 @@ const navigateToPermissions = (row: any) => {
                 :create-button="createButton"
                 :delete-dialog="deleteDialog"
                 :delete-loading="isDeleting"
+                :filters="filters"
+                :filter-values="filterValues"
+                :export-config="exportConfig"
+                :export-loading="isExporting"
                 @search="handleSearch"
                 @update:current-page="currentPage = $event; fetchData()"
                 @update:per-page="perPage = $event; currentPage = 1; fetchData()"
+                @update:filter-values="handleFilterUpdate"
+                @filter="handleFilter"
+                @filter-reset="handleFilterReset"
+                @export-excel="handleExportExcel"
+                @export-pdf="handleExportPdf"
                 @row-click="navigateToView"
                 @action-view="navigateToView"
                 @action-edit="navigateToEdit"
