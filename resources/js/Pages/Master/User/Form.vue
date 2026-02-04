@@ -2,8 +2,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { useUiStore } from '@/stores/ui';
 import { FormPage } from '@/Components/Form';
-import { BaseInput, BaseSelect, BaseCheckbox } from '@/Components/Form';
-import type { SelectOption } from '@/types';
+import { BaseInput, BaseSelect, BaseCheckbox, BaseBrowse } from '@/Components/Form';
+import type { SelectOption, BrowseConfig } from '@/types';
 import axios from 'axios';
 
 type FormMode = 'create' | 'edit' | 'view';
@@ -28,7 +28,19 @@ const saving = ref(false);
 
 // Options
 const roleOptions = ref<SelectOption[]>([]);
-const branchOptions = ref<SelectOption[]>([]);
+
+const branchBrowseConfig: BrowseConfig = {
+    endpoint: '/api/branches',
+    title: 'BROWSE CABANG',
+    columns: [
+        { key: 'code', label: 'Kode', width: '120px' },
+        { key: 'name', label: 'Nama' },
+        { key: 'address', label: 'Alamat' },
+        { key: 'phone', label: 'Telepon', width: '150px' },
+    ],
+    displayFormat: '{code} - {name}',
+    searchPlaceholder: 'Cari cabang...',
+};
 
 const form = ref({
     name: '',
@@ -47,12 +59,8 @@ const pageTitle = computed(() => {
 
 const fetchOptions = async () => {
     try {
-        const [rolesRes, branchesRes] = await Promise.all([
-            axios.get('/api/roles/list'),
-            axios.get('/api/branches/list'),
-        ]);
+        const rolesRes = await axios.get('/api/roles/list');
         roleOptions.value = rolesRes.data.data.map((r: any) => ({ value: r.id, label: r.name }));
-        branchOptions.value = branchesRes.data.data.map((b: any) => ({ value: b.id, label: `${b.code} - ${b.name}` }));
     } catch (error) {
         console.error('Failed to fetch options:', error);
     }
@@ -194,11 +202,11 @@ onMounted(async () => {
                     required
                 />
 
-                <BaseSelect
+                <BaseBrowse
                     v-model="form.branch_id"
-                    :options="branchOptions"
+                    :config="branchBrowseConfig"
                     label="Cabang"
-                    placeholder="Pilih cabang"
+                    placeholder="Pilih cabang..."
                     :error="formErrors.branch_id"
                     :disabled="readonly"
                     required
