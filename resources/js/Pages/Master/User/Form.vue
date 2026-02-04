@@ -39,6 +39,8 @@ const branchBrowseConfig: BrowseConfig = {
         { key: 'phone', label: 'Telepon', width: '150px' },
     ],
     displayFormat: '{code} - {name}',
+    dropdownFormat: '{code} - {name}',
+    createRoute: '/master/branch/create',
     searchPlaceholder: 'Cari cabang...',
 };
 
@@ -214,6 +216,7 @@ onMounted(async () => {
                     :error="formErrors.branch_id"
                     :disabled="readonly"
                     required
+                    @navigate="(route: string) => emit('navigate', route)"
                 />
 
                 <div class="md:col-span-2">
