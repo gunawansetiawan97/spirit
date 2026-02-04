@@ -1,30 +1,28 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { useUiStore } from '@/stores/ui';
+import { ref, onMounted } from 'vue';
 import { FormPage, AuditInfo } from '@/Components/Form';
 import { BaseInput, BaseTextarea, BaseCheckbox } from '@/Components/Form';
-import axios from 'axios';
+import { useFormPage } from '@/Composables';
 
-type FormMode = 'create' | 'edit' | 'view';
-
-interface Props {
+const props = withDefaults(defineProps<{
     id?: string | number;
-    mode: FormMode;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-    mode: 'create',
-});
+    mode: 'create' | 'edit' | 'view';
+}>(), { mode: 'create' });
 
 const emit = defineEmits<{
     (e: 'navigate', route: string): void;
 }>();
 
-const uiStore = useUiStore();
-
-const loading = ref(false);
-const saving = ref(false);
-const activeTab = ref('data');
+const {
+    loading, saving, formErrors, activeTab, auditData, recordId,
+    formTabs, pageTitle, setupPage, fetchData, handleSubmit, handleBack, handleEdit,
+} = useFormPage({
+    title: 'Cabang',
+    apiEndpoint: '/api/branches',
+    basePath: '/master/branch',
+    auditType: 'branch',
+    auditRelations: ['createdBy', 'updatedBy', 'approvedBy', 'printedBy'],
+}, props, emit);
 
 const form = ref({
     code: '',
@@ -34,30 +32,9 @@ const form = ref({
     is_active: true,
 });
 
-const formErrors = ref<Record<string, string>>({});
-
-const auditData = ref<any>(null);
-const recordId = ref<number | null>(null);
-
-const pageTitle = computed(() => {
-    return 'Cabang';
-});
-
-const formTabs = computed(() => {
-    if (props.mode === 'create') return undefined;
-    return [
-        { key: 'data', label: 'DATA' },
-        { key: 'info', label: 'INFO' },
-    ];
-});
-
-const fetchData = async () => {
-    if (!props.id) return;
-
-    loading.value = true;
-    try {
-        const response = await axios.get(`/api/branches/${props.id}`);
-        const data = response.data.data;
+onMounted(async () => {
+    setupPage();
+    await fetchData((data) => {
         form.value = {
             code: data.code,
             name: data.name,
@@ -65,76 +42,10 @@ const fetchData = async () => {
             phone: data.phone || '',
             is_active: data.is_active,
         };
-        recordId.value = data.id;
-        auditData.value = {
-            created_by: data.created_by_user,
-            updated_by: data.updated_by_user,
-            approved_by: data.approved_by_user,
-            printed_by: data.printed_by_user,
-            created_at: data.created_at,
-            updated_at: data.updated_at,
-            approved_at: data.approved_at,
-            printed_at: data.printed_at,
-        };
-    } catch (error: any) {
-        console.error('Failed to fetch branch:', error);
-        alert('Gagal memuat data cabang');
-        emit('navigate', '/master/branch');
-    } finally {
-        loading.value = false;
-    }
-};
-
-const handleSubmit = async () => {
-    formErrors.value = {};
-    saving.value = true;
-
-    try {
-        if (props.mode === 'edit' && props.id) {
-            await axios.put(`/api/branches/${props.id}`, form.value);
-        } else {
-            await axios.post('/api/branches', form.value);
-        }
-        emit('navigate', '/master/branch');
-    } catch (error: any) {
-        if (error.response?.data?.errors) {
-            formErrors.value = Object.fromEntries(
-                Object.entries(error.response.data.errors).map(([key, value]) => [
-                    key,
-                    Array.isArray(value) ? value[0] : value,
-                ])
-            ) as Record<string, string>;
-        } else {
-            alert(error.response?.data?.message || 'Gagal menyimpan data');
-        }
-    } finally {
-        saving.value = false;
-    }
-};
-
-const handleBack = () => {
-    emit('navigate', '/master/branch');
-};
-
-const handleEdit = () => {
-    if (props.id) {
-        emit('navigate', `/master/branch/${props.id}/edit`);
-    }
-};
-
-onMounted(() => {
-    const titles: Record<FormMode, string> = {
-        create: 'Tambah Cabang',
-        edit: 'Edit Cabang',
-        view: 'Detail Cabang',
-    };
-    uiStore.setPageTitle(titles[props.mode]);
-    uiStore.setPageActions([]);
-
-    if (props.id && (props.mode === 'edit' || props.mode === 'view')) {
-        fetchData();
-    }
+    });
 });
+
+const onSubmit = () => handleSubmit(() => ({ ...form.value }));
 </script>
 
 <template>
@@ -145,7 +56,7 @@ onMounted(() => {
         :saving="saving"
         :tabs="formTabs"
         v-model:active-tab="activeTab"
-        @submit="handleSubmit"
+        @submit="onSubmit"
         @back="handleBack"
         @edit="handleEdit"
     >
