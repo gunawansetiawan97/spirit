@@ -144,7 +144,7 @@ export interface BrowseConfig {
     showEndpoint?: string;
     /** Route to navigate for creating a new record (shows + button) */
     createRoute?: string;
-    modalSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+    modalSize?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full';
     perPage?: number;
     searchPlaceholder?: string;
 }

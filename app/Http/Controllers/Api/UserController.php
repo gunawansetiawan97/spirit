@@ -11,7 +11,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::with(['role:id,uuid,code,name', 'branch:id,uuid,code,name']);
+        $query = User::with(['role:id,uuid,code,name', 'branches:id,uuid,code,name']);
 
         if ($request->search) {
             $query->where(function ($q) use ($request) {
@@ -25,7 +25,9 @@ class UserController extends Controller
         }
 
         if ($request->branch_id) {
-            $query->where('branch_id', $request->branch_id);
+            $query->whereHas('branches', function ($q) use ($request) {
+                $q->where('branches.id', $request->branch_id);
+            });
         }
 
         if ($request->is_active !== null) {
@@ -73,7 +75,8 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'role_id' => 'required|exists:roles,id',
-            'branch_id' => 'required|exists:branches,id',
+            'branch_ids' => 'required|array|min:1',
+            'branch_ids.*' => 'exists:branches,id',
             'is_active' => 'boolean',
         ]);
 
@@ -82,11 +85,13 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role_id' => $request->role_id,
-            'branch_id' => $request->branch_id,
+            'branch_id' => $request->branch_ids[0],
             'is_active' => $request->is_active ?? true,
         ]);
 
-        $user->load(['role:id,uuid,code,name', 'branch:id,uuid,code,name']);
+        $user->branches()->sync($request->branch_ids);
+
+        $user->load(['role:id,uuid,code,name', 'branches:id,uuid,code,name']);
 
         return response()->json([
             'status' => 'success',
@@ -97,7 +102,7 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        $user->load(['role:id,uuid,code,name', 'branch:id,uuid,code,name']);
+        $user->load(['role:id,uuid,code,name', 'branches:id,uuid,code,name']);
 
         return response()->json([
             'status' => 'success',
@@ -112,7 +117,8 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email,' . $user->id,
             'password' => 'nullable|string|min:6',
             'role_id' => 'required|exists:roles,id',
-            'branch_id' => 'required|exists:branches,id',
+            'branch_ids' => 'required|array|min:1',
+            'branch_ids.*' => 'exists:branches,id',
             'is_active' => 'boolean',
         ]);
 
@@ -120,7 +126,7 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'role_id' => $request->role_id,
-            'branch_id' => $request->branch_id,
+            'branch_id' => $request->branch_ids[0],
             'is_active' => $request->is_active ?? $user->is_active,
         ];
 
@@ -129,7 +135,9 @@ class UserController extends Controller
         }
 
         $user->update($data);
-        $user->load(['role:id,uuid,code,name', 'branch:id,uuid,code,name']);
+        $user->branches()->sync($request->branch_ids);
+
+        $user->load(['role:id,uuid,code,name', 'branches:id,uuid,code,name']);
 
         return response()->json([
             'status' => 'success',
@@ -148,6 +156,7 @@ class UserController extends Controller
             ], 422);
         }
 
+        $user->branches()->detach();
         $user->delete();
 
         return response()->json([

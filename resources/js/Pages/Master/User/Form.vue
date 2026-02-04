@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useUiStore } from '@/stores/ui';
 import { FormPage } from '@/Components/Form';
-import { BaseInput, BaseSelect, BaseCheckbox, BaseBrowse } from '@/Components/Form';
+import { BaseInput, BaseSelect, BaseCheckbox, BaseBrowseMulti } from '@/Components/Form';
 import type { SelectOption, BrowseConfig } from '@/types';
 import axios from 'axios';
 
@@ -49,11 +49,11 @@ const form = ref({
     email: '',
     password: '',
     role_id: null as number | null,
-    branch_id: null as number | null,
+    branch_ids: [] as number[],
     is_active: true,
 });
 
-const branchRowData = ref<any>(null);
+const branchRowsData = ref<any[]>([]);
 
 const formErrors = ref<Record<string, string>>({});
 
@@ -82,10 +82,10 @@ const fetchData = async () => {
             email: data.email,
             password: '',
             role_id: data.role?.id || null,
-            branch_id: data.branch?.id || null,
+            branch_ids: data.branches?.map((b: any) => b.id) || [],
             is_active: data.is_active,
         };
-        branchRowData.value = data.branch || null;
+        branchRowsData.value = data.branches || [];
     } catch (error: any) {
         console.error('Failed to fetch user:', error);
         alert('Gagal memuat data user');
@@ -207,17 +207,19 @@ onMounted(async () => {
                     required
                 />
 
-                <BaseBrowse
-                    v-model="form.branch_id"
-                    :config="branchBrowseConfig"
-                    :row-data="branchRowData"
-                    label="Cabang"
-                    placeholder="Pilih cabang..."
-                    :error="formErrors.branch_id"
-                    :disabled="readonly"
-                    required
-                    @navigate="(route: string) => emit('navigate', route)"
-                />
+                <div class="md:col-span-2">
+                    <BaseBrowseMulti
+                        v-model="form.branch_ids"
+                        :config="branchBrowseConfig"
+                        :rows-data="branchRowsData"
+                        label="Cabang"
+                        placeholder="Pilih cabang..."
+                        :error="formErrors.branch_ids"
+                        :disabled="readonly"
+                        required
+                        @navigate="(route: string) => emit('navigate', route)"
+                    />
+                </div>
 
                 <div class="md:col-span-2">
                     <BaseCheckbox

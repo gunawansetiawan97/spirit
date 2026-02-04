@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useBrowse } from '@/Composables/useBrowse';
 import { BaseModal } from '@/Components/Modal';
 import TablePagination from '@/Components/Table/TablePagination.vue';
 import type { BrowseConfig, BrowseColumn } from '@/types';
 
 interface Props {
-    modelValue?: string | number | null;
+    modelValue?: (string | number)[];
     config: BrowseConfig;
     placeholder?: string;
     disabled?: boolean;
@@ -15,19 +15,22 @@ interface Props {
     required?: boolean;
     helpText?: string;
     id?: string;
-    rowData?: any;
+    rowsData?: any[];
+    max?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    modelValue: null,
+    modelValue: () => [],
     placeholder: 'Cari...',
-    rowData: undefined,
+    rowsData: undefined,
+    max: undefined,
 });
 
 const emit = defineEmits<{
-    (e: 'update:modelValue', value: string | number | null): void;
-    (e: 'change', value: string | number | null): void;
+    (e: 'update:modelValue', value: (string | number)[]): void;
+    (e: 'change', value: (string | number)[]): void;
     (e: 'select', row: any): void;
+    (e: 'unselect', row: any): void;
     (e: 'navigate', route: string): void;
 }>();
 
@@ -36,7 +39,7 @@ const isModalOpen = ref(false);
 const isDropdownOpen = ref(false);
 const inputSearch = ref('');
 const modalSearch = ref('');
-const selectedRow = ref<any>(null);
+const selectedRows = ref<any[]>([]);
 const highlightedIndex = ref(-1);
 const containerRef = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -47,6 +50,11 @@ const dropdown = reactive(useBrowse(props.config));
 const modal = reactive(useBrowse(props.config));
 
 const valueKey = computed(() => props.config.valueKey ?? 'id');
+
+const canAddMore = computed(() => {
+    if (!props.max) return true;
+    return selectedRows.value.length < props.max;
+});
 
 // --- Utility functions ---
 
@@ -66,19 +74,25 @@ const formatDropdownItem = (row: any): string => {
     return formatDisplay(row, props.config.dropdownFormat ?? props.config.displayFormat);
 };
 
-// --- Computed ---
+// --- Selection helpers ---
 
-const displayLabel = computed(() => {
-    if (props.modelValue === null || props.modelValue === undefined || props.modelValue === '') {
-        return '';
-    }
-    if (!selectedRow.value) {
-        return dropdown.resolving ? 'Memuat...' : '';
-    }
-    return formatDisplay(selectedRow.value);
+const selectedIdSet = computed(() => {
+    return new Set(props.modelValue?.map(String) ?? []);
 });
 
-const isInputMode = computed(() => !displayLabel.value || isDropdownOpen.value);
+const isRowSelected = (row: any): boolean => {
+    return selectedIdSet.value.has(String(row[valueKey.value]));
+};
+
+const isAllPageSelected = computed(() => {
+    if (modal.data.length === 0) return false;
+    return modal.data.every((row: any) => isRowSelected(row));
+});
+
+const isSomePageSelected = computed(() => {
+    if (modal.data.length === 0) return false;
+    return modal.data.some((row: any) => isRowSelected(row)) && !isAllPageSelected.value;
+});
 
 // --- Dropdown (autocomplete) ---
 
@@ -88,7 +102,6 @@ const openDropdown = () => {
     if (props.disabled) return;
     isDropdownOpen.value = true;
     highlightedIndex.value = -1;
-    // Fetch if we don't have data yet
     if (dropdown.data.length === 0) {
         dropdown.resetState();
         dropdown.fetchData();
@@ -98,10 +111,7 @@ const openDropdown = () => {
 const closeDropdown = () => {
     isDropdownOpen.value = false;
     highlightedIndex.value = -1;
-    // If we have a selected row, restore the display
-    if (selectedRow.value) {
-        inputSearch.value = '';
-    }
+    inputSearch.value = '';
 };
 
 const handleInputFocus = () => {
@@ -121,6 +131,12 @@ const handleInputChange = () => {
 };
 
 const handleInputKeydown = (e: KeyboardEvent) => {
+    // Backspace on empty input removes last chip
+    if (e.key === 'Backspace' && !inputSearch.value && selectedRows.value.length > 0) {
+        removeRow(selectedRows.value.length - 1);
+        return;
+    }
+
     if (!isDropdownOpen.value) {
         if (e.key === 'ArrowDown' || e.key === 'Enter') {
             e.preventDefault();
@@ -147,7 +163,7 @@ const handleInputKeydown = (e: KeyboardEvent) => {
         case 'Enter':
             e.preventDefault();
             if (highlightedIndex.value >= 0 && highlightedIndex.value < dropdown.data.length) {
-                selectRow(dropdown.data[highlightedIndex.value]);
+                toggleRow(dropdown.data[highlightedIndex.value]);
             }
             break;
         case 'Escape':
@@ -164,22 +180,73 @@ const scrollToHighlighted = () => {
 
 // --- Selection ---
 
-const selectRow = (row: any) => {
-    const value = row[valueKey.value];
-    selectedRow.value = row;
+const toggleRow = (row: any) => {
+    const id = row[valueKey.value];
+    if (isRowSelected(row)) {
+        // Remove
+        const newRows = selectedRows.value.filter(r => String(r[valueKey.value]) !== String(id));
+        selectedRows.value = newRows;
+        const newValues = newRows.map(r => r[valueKey.value]);
+        emit('update:modelValue', newValues);
+        emit('change', newValues);
+        emit('unselect', row);
+    } else {
+        // Add (check max)
+        if (!canAddMore.value) return;
+        const newRows = [...selectedRows.value, row];
+        selectedRows.value = newRows;
+        const newValues = newRows.map(r => r[valueKey.value]);
+        emit('update:modelValue', newValues);
+        emit('change', newValues);
+        emit('select', row);
+    }
     inputSearch.value = '';
-    isDropdownOpen.value = false;
-    isModalOpen.value = false;
-    emit('update:modelValue', value);
-    emit('change', value);
-    emit('select', row);
 };
 
-const clearSelection = () => {
-    selectedRow.value = null;
-    inputSearch.value = '';
-    emit('update:modelValue', null);
-    emit('change', null);
+const removeRow = (index: number) => {
+    const row = selectedRows.value[index];
+    const newRows = [...selectedRows.value];
+    newRows.splice(index, 1);
+    selectedRows.value = newRows;
+    const newValues = newRows.map(r => r[valueKey.value]);
+    emit('update:modelValue', newValues);
+    emit('change', newValues);
+    if (row) emit('unselect', row);
+    nextTick(() => inputRef.value?.focus());
+};
+
+const clearAll = () => {
+    const oldRows = [...selectedRows.value];
+    selectedRows.value = [];
+    emit('update:modelValue', []);
+    emit('change', []);
+    oldRows.forEach(row => emit('unselect', row));
+    nextTick(() => inputRef.value?.focus());
+};
+
+const toggleAllPage = () => {
+    if (isAllPageSelected.value) {
+        // Unselect all on current page
+        const pageIds = new Set(modal.data.map((r: any) => String(r[valueKey.value])));
+        const newRows = selectedRows.value.filter(r => !pageIds.has(String(r[valueKey.value])));
+        selectedRows.value = newRows;
+        const newValues = newRows.map(r => r[valueKey.value]);
+        emit('update:modelValue', newValues);
+        emit('change', newValues);
+    } else {
+        // Select all on current page (that aren't already selected)
+        const existing = new Set(selectedRows.value.map(r => String(r[valueKey.value])));
+        const toAdd = modal.data.filter((r: any) => !existing.has(String(r[valueKey.value])));
+        if (props.max) {
+            const remaining = props.max - selectedRows.value.length;
+            toAdd.splice(remaining);
+        }
+        const newRows = [...selectedRows.value, ...toAdd];
+        selectedRows.value = newRows;
+        const newValues = newRows.map(r => r[valueKey.value]);
+        emit('update:modelValue', newValues);
+        emit('change', newValues);
+    }
 };
 
 // --- Action buttons ---
@@ -219,6 +286,10 @@ const openModal = () => {
     modal.fetchData();
 };
 
+const closeModal = () => {
+    isModalOpen.value = false;
+};
+
 const handleModalSearch = () => {
     modal.handleSearch(modalSearch.value);
 };
@@ -243,10 +314,6 @@ const getCellDisplay = (row: any, col: BrowseColumn): string => {
 
 const rowNumber = (index: number): number => {
     return (modal.currentPage - 1) * modal.perPage + index + 1;
-};
-
-const isSelected = (row: any): boolean => {
-    return String(row[valueKey.value]) === String(props.modelValue);
 };
 
 const getAlignClass = (align?: string): string => {
@@ -275,9 +342,11 @@ onBeforeUnmount(() => {
 // --- Watch for pre-loaded data ---
 
 watch(
-    () => props.rowData,
-    (row) => {
-        if (row) selectedRow.value = row;
+    () => props.rowsData,
+    (rows) => {
+        if (rows && rows.length > 0) {
+            selectedRows.value = [...rows];
+        }
     },
     { immediate: true },
 );
@@ -285,14 +354,19 @@ watch(
 watch(
     () => props.modelValue,
     async (newVal) => {
-        if (newVal === null || newVal === undefined || newVal === '') {
-            selectedRow.value = null;
+        if (!newVal || newVal.length === 0) {
+            selectedRows.value = [];
             return;
         }
-        if (!selectedRow.value && !props.rowData) {
-            await dropdown.resolveValue(newVal);
-            if (dropdown.resolvedRow) {
-                selectedRow.value = dropdown.resolvedRow;
+        // Only resolve if we don't already have all rows loaded
+        const loadedIds = new Set(selectedRows.value.map(r => String(r[valueKey.value])));
+        const missingIds = newVal.filter(id => !loadedIds.has(String(id)));
+        if (missingIds.length > 0 && !props.rowsData) {
+            for (const id of missingIds) {
+                await dropdown.resolveValue(id);
+                if (dropdown.resolvedRow) {
+                    selectedRows.value = [...selectedRows.value, dropdown.resolvedRow];
+                }
             }
         }
     },
@@ -301,12 +375,12 @@ watch(
 
 // --- Input classes ---
 
-const inputClasses = computed(() => [
-    'block w-full rounded-l-md border py-2 pl-3 pr-2 text-sm shadow-sm transition-colors',
-    'focus:outline-none focus:ring-1 focus:ring-offset-0',
+const containerClasses = computed(() => [
+    'flex flex-wrap items-center gap-1 rounded-l-md border px-2 py-1.5 text-sm shadow-sm transition-colors min-h-[38px]',
+    'focus-within:outline-none focus-within:ring-1 focus-within:ring-offset-0',
     props.error
-        ? 'border-danger-500 text-danger-900 focus:border-danger-500 focus:ring-danger-500'
-        : 'border-gray-300 text-gray-900 focus:border-primary-500 focus:ring-primary-500',
+        ? 'border-danger-500 focus-within:border-danger-500 focus-within:ring-danger-500'
+        : 'border-gray-300 focus-within:border-primary-500 focus-within:ring-primary-500',
     props.disabled ? 'cursor-not-allowed bg-gray-100' : 'bg-white',
 ]);
 </script>
@@ -319,43 +393,61 @@ const inputClasses = computed(() => [
             <span v-if="required" class="text-danger-500">*</span>
         </label>
 
-        <!-- Input + Action Buttons -->
+        <!-- Chips + Input + Action Buttons -->
         <div class="flex">
-            <!-- Input field -->
-            <div class="relative flex-1">
+            <!-- Chips container + input -->
+            <div
+                :class="containerClasses"
+                class="flex-1 cursor-text"
+                @click="inputRef?.focus()"
+            >
+                <!-- Selected chips -->
+                <span
+                    v-for="(row, index) in selectedRows"
+                    :key="row[valueKey]"
+                    class="inline-flex items-center gap-1 rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700"
+                >
+                    <span class="max-w-[150px] truncate">{{ formatDisplay(row) }}</span>
+                    <button
+                        v-if="!disabled"
+                        type="button"
+                        class="flex-shrink-0 text-primary-400 hover:text-primary-600"
+                        tabindex="-1"
+                        @click.stop="removeRow(index)"
+                    >
+                        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </span>
+
+                <!-- Search input -->
                 <input
-                    v-if="isInputMode"
                     :id="id"
                     ref="inputRef"
                     v-model="inputSearch"
                     type="text"
-                    :class="inputClasses"
-                    :placeholder="placeholder"
+                    class="min-w-[80px] flex-1 border-none bg-transparent p-0 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0"
+                    :placeholder="selectedRows.length === 0 ? placeholder : ''"
                     :disabled="disabled"
                     autocomplete="off"
                     @focus="handleInputFocus"
                     @input="handleInputChange"
                     @keydown="handleInputKeydown"
                 />
-                <div
-                    v-else
-                    :class="inputClasses"
-                    class="flex cursor-pointer items-center"
-                    @click="() => { clearSelection(); inputRef?.focus(); }"
+
+                <!-- Clear all button -->
+                <button
+                    v-if="selectedRows.length > 0 && !disabled"
+                    type="button"
+                    class="ml-auto flex-shrink-0 text-gray-400 hover:text-gray-600"
+                    tabindex="-1"
+                    @click.stop="clearAll"
                 >
-                    <span class="flex-1 truncate">{{ displayLabel }}</span>
-                    <button
-                        v-if="!disabled"
-                        type="button"
-                        class="ml-1 flex-shrink-0 text-gray-400 hover:text-gray-600"
-                        tabindex="-1"
-                        @click.stop="clearSelection"
-                    >
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
 
             <!-- Action buttons -->
@@ -413,17 +505,29 @@ const inputClasses = computed(() => [
                         v-for="(row, index) in dropdown.data"
                         :key="row[valueKey]"
                         :data-index="index"
-                        class="cursor-pointer select-none px-3 py-2 text-sm transition-colors"
+                        class="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-sm transition-colors"
                         :class="[
                             highlightedIndex === index
                                 ? 'bg-primary-50 text-primary-700'
                                 : 'text-gray-900 hover:bg-gray-50',
-                            isSelected(row) ? 'font-medium' : '',
                         ]"
-                        @click="selectRow(row)"
+                        @click="toggleRow(row)"
                         @mouseenter="highlightedIndex = index"
                     >
-                        {{ formatDropdownItem(row) }}
+                        <!-- Checkmark -->
+                        <svg
+                            v-if="isRowSelected(row)"
+                            class="h-4 w-4 flex-shrink-0 text-primary-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span v-else class="h-4 w-4 flex-shrink-0" />
+                        <span :class="{ 'font-medium': isRowSelected(row) }">
+                            {{ formatDropdownItem(row) }}
+                        </span>
                     </li>
                 </ul>
                 <!-- Dropdown pagination -->
@@ -500,6 +604,17 @@ const inputClasses = computed(() => [
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
+                            <!-- Checkbox header -->
+                            <th class="w-10 px-3 py-3 text-center">
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    :checked="isAllPageSelected"
+                                    :indeterminate="isSomePageSelected"
+                                    :disabled="modal.loading || modal.data.length === 0"
+                                    @change="toggleAllPage"
+                                />
+                            </th>
                             <th class="w-12 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
                                 #
                             </th>
@@ -516,7 +631,7 @@ const inputClasses = computed(() => [
                     </thead>
                     <tbody class="divide-y divide-gray-200 bg-white">
                         <tr v-if="modal.loading">
-                            <td :colspan="config.columns.length + 1" class="px-3 py-8 text-center">
+                            <td :colspan="config.columns.length + 2" class="px-3 py-8 text-center">
                                 <svg class="mx-auto h-6 w-6 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -525,7 +640,7 @@ const inputClasses = computed(() => [
                             </td>
                         </tr>
                         <tr v-else-if="modal.data.length === 0">
-                            <td :colspan="config.columns.length + 1" class="px-3 py-8 text-center text-sm text-gray-500">
+                            <td :colspan="config.columns.length + 2" class="px-3 py-8 text-center text-sm text-gray-500">
                                 Tidak ada data
                             </td>
                         </tr>
@@ -534,9 +649,19 @@ const inputClasses = computed(() => [
                             v-else
                             :key="row[valueKey]"
                             class="cursor-pointer transition-colors hover:bg-primary-50"
-                            :class="{ 'bg-primary-50 font-medium': isSelected(row) }"
-                            @click="selectRow(row)"
+                            :class="{ 'bg-primary-50': isRowSelected(row) }"
+                            @click="toggleRow(row)"
                         >
+                            <!-- Checkbox -->
+                            <td class="px-3 py-2 text-center">
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    :checked="isRowSelected(row)"
+                                    @click.stop
+                                    @change="toggleRow(row)"
+                                />
+                            </td>
                             <td class="whitespace-nowrap px-3 py-2 text-center text-sm text-gray-500">
                                 {{ rowNumber(index) }}
                             </td>
@@ -562,6 +687,23 @@ const inputClasses = computed(() => [
                     @update:current-page="handlePageChange"
                 />
             </div>
+
+            <!-- Footer -->
+            <template #footer>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-500">
+                        {{ selectedRows.length }} item dipilih
+                        <template v-if="max"> (maks {{ max }})</template>
+                    </span>
+                    <button
+                        type="button"
+                        class="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                        @click="closeModal"
+                    >
+                        Selesai
+                    </button>
+                </div>
+            </template>
         </BaseModal>
     </div>
 </template>
