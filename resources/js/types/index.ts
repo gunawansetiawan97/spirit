@@ -25,12 +25,24 @@ export interface FormField {
 }
 
 // Table Types
+export type CellType = 'text' | 'status' | 'date' | 'datetime' | 'number' | 'currency';
+
+export interface StatusConfig {
+    activeText?: string;
+    inactiveText?: string;
+    activeClass?: string;
+    inactiveClass?: string;
+}
+
 export interface TableColumn {
     key: string;
     label: string;
     sortable?: boolean;
     width?: string;
     align?: 'left' | 'center' | 'right';
+    type?: CellType;
+    statusConfig?: StatusConfig;
+    emptyText?: string;
     formatter?: (value: any, row: any) => string;
 }
 

@@ -33,7 +33,7 @@ const columns: TableColumn[] = [
     { key: 'email', label: 'Email', sortable: true },
     { key: 'role.name', label: 'Role' },
     { key: 'branch.name', label: 'Cabang' },
-    { key: 'is_active', label: 'Status', width: '100px', align: 'center' },
+    { key: 'is_active', label: 'Status', width: '100px', align: 'center', type: 'status' },
 ];
 
 const actions = computed<ActionConfig[]>(() => [
@@ -147,21 +147,6 @@ onMounted(() => {
                         </svg>
                         Tambah User
                     </BaseButton>
-                </template>
-
-                <template #cell-role\.name="{ row }">
-                    {{ row.role?.name || '-' }}
-                </template>
-                <template #cell-branch\.name="{ row }">
-                    {{ row.branch?.name || '-' }}
-                </template>
-                <template #cell-is_active="{ value }">
-                    <span
-                        class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
-                        :class="value ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'"
-                    >
-                        {{ value ? 'Aktif' : 'Nonaktif' }}
-                    </span>
                 </template>
             </DataTable>
         </div>

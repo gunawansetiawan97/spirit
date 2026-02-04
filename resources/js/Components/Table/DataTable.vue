@@ -145,12 +145,35 @@ const getSortIcon = (column: TableColumn) => {
     return localSort.value.direction;
 };
 
-const getCellValue = (row: any, column: TableColumn) => {
-    const value = row[column.key];
+// Get value from nested key path (e.g., 'role.name')
+const getNestedValue = (obj: any, path: string): any => {
+    return path.split('.').reduce((current, key) => current?.[key], obj);
+};
+
+const getCellValue = (row: any, column: TableColumn): any => {
+    const value = getNestedValue(row, column.key);
     if (column.formatter) {
         return column.formatter(value, row);
     }
-    return value ?? '-';
+    return value;
+};
+
+const getCellDisplay = (row: any, column: TableColumn): string => {
+    const value = getCellValue(row, column);
+    return value ?? column.emptyText ?? '-';
+};
+
+const isStatusColumn = (column: TableColumn): boolean => {
+    return column.type === 'status';
+};
+
+const getStatusConfig = (column: TableColumn) => {
+    return {
+        activeText: column.statusConfig?.activeText ?? 'Aktif',
+        inactiveText: column.statusConfig?.inactiveText ?? 'Nonaktif',
+        activeClass: column.statusConfig?.activeClass ?? 'bg-success-100 text-success-800',
+        inactiveClass: column.statusConfig?.inactiveClass ?? 'bg-gray-100 text-gray-800',
+    };
 };
 
 const getAlignClass = (align?: string) => {
@@ -291,7 +314,19 @@ const getAlignClass = (align?: string) => {
                             :class="getAlignClass(column.align)"
                         >
                             <slot :name="`cell-${column.key}`" :row="row" :value="getCellValue(row, column)">
-                                {{ getCellValue(row, column) }}
+                                <!-- Status cell type -->
+                                <template v-if="isStatusColumn(column)">
+                                    <span
+                                        class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
+                                        :class="getCellValue(row, column) ? getStatusConfig(column).activeClass : getStatusConfig(column).inactiveClass"
+                                    >
+                                        {{ getCellValue(row, column) ? getStatusConfig(column).activeText : getStatusConfig(column).inactiveText }}
+                                    </span>
+                                </template>
+                                <!-- Default text -->
+                                <template v-else>
+                                    {{ getCellDisplay(row, column) }}
+                                </template>
                             </slot>
                         </td>
                         <!-- Actions -->

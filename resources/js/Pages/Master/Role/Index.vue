@@ -33,7 +33,7 @@ const columns: TableColumn[] = [
     { key: 'name', label: 'Nama', sortable: true },
     { key: 'description', label: 'Deskripsi' },
     { key: 'users_count', label: 'Jumlah User', width: '120px', align: 'center' },
-    { key: 'is_active', label: 'Status', width: '100px', align: 'center' },
+    { key: 'is_active', label: 'Status', width: '100px', align: 'center', type: 'status' },
 ];
 
 const actions: ActionConfig[] = [
@@ -148,15 +148,6 @@ onMounted(() => {
                         </svg>
                         Tambah Role
                     </BaseButton>
-                </template>
-
-                <template #cell-is_active="{ value }">
-                    <span
-                        class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
-                        :class="value ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'"
-                    >
-                        {{ value ? 'Aktif' : 'Nonaktif' }}
-                    </span>
                 </template>
             </DataTable>
         </div>
