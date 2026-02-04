@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useUiStore } from '@/stores/ui';
-import { FormPage } from '@/Components/Form';
+import { FormPage, AuditInfo } from '@/Components/Form';
 import { BaseInput, BaseTextarea, BaseCheckbox } from '@/Components/Form';
 import axios from 'axios';
 
@@ -24,6 +24,7 @@ const uiStore = useUiStore();
 
 const loading = ref(false);
 const saving = ref(false);
+const activeTab = ref('data');
 
 const form = ref({
     code: '',
@@ -35,8 +36,19 @@ const form = ref({
 
 const formErrors = ref<Record<string, string>>({});
 
+const auditData = ref<any>(null);
+const recordId = ref<number | null>(null);
+
 const pageTitle = computed(() => {
     return 'Cabang';
+});
+
+const formTabs = computed(() => {
+    if (props.mode === 'create') return undefined;
+    return [
+        { key: 'data', label: 'DATA' },
+        { key: 'info', label: 'INFO' },
+    ];
 });
 
 const fetchData = async () => {
@@ -52,6 +64,17 @@ const fetchData = async () => {
             address: data.address || '',
             phone: data.phone || '',
             is_active: data.is_active,
+        };
+        recordId.value = data.id;
+        auditData.value = {
+            created_by: data.created_by_user,
+            updated_by: data.updated_by_user,
+            approved_by: data.approved_by_user,
+            printed_by: data.printed_by_user,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            approved_at: data.approved_at,
+            printed_at: data.printed_at,
         };
     } catch (error: any) {
         console.error('Failed to fetch branch:', error);
@@ -120,6 +143,8 @@ onMounted(() => {
         :mode="mode"
         :loading="loading"
         :saving="saving"
+        :tabs="formTabs"
+        v-model:active-tab="activeTab"
         @submit="handleSubmit"
         @back="handleBack"
         @edit="handleEdit"
@@ -171,6 +196,14 @@ onMounted(() => {
                     />
                 </div>
             </div>
+        </template>
+
+        <template v-if="recordId" #tab-info>
+            <AuditInfo
+                loggable-type="branch"
+                :loggable-id="recordId"
+                :audit-data="auditData"
+            />
         </template>
     </FormPage>
 </template>

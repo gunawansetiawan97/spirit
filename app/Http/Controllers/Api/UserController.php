@@ -102,11 +102,20 @@ class UserController extends Controller
 
     public function show(User $user)
     {
-        $user->load(['role:id,uuid,code,name', 'branches:id,uuid,code,name']);
+        $user->load([
+            'role:id,uuid,code,name',
+            'branches:id,uuid,code,name',
+            'createdBy:id,name',
+            'updatedBy:id,name',
+        ]);
+
+        $data = $user->toArray();
+        $data['created_by_user'] = $user->createdBy;
+        $data['updated_by_user'] = $user->updatedBy;
 
         return response()->json([
             'status' => 'success',
-            'data' => $user,
+            'data' => $data,
         ]);
     }
 

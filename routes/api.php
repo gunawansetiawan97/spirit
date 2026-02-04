@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\ActivityLogController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -35,4 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/permissions/tree', [PermissionController::class, 'tree']);
     Route::get('/permissions/parents', [PermissionController::class, 'parents']);
     Route::apiResource('/permissions', PermissionController::class);
+
+    // Activity Logs
+    Route::get('/activity-logs', [ActivityLogController::class, 'index']);
 });

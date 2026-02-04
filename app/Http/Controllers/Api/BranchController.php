@@ -79,9 +79,22 @@ class BranchController extends Controller
 
     public function show(Branch $branch)
     {
+        $branch->load([
+            'createdBy:id,name',
+            'updatedBy:id,name',
+            'approvedBy:id,name',
+            'printedBy:id,name',
+        ]);
+
+        $data = $branch->toArray();
+        $data['created_by_user'] = $branch->createdBy;
+        $data['updated_by_user'] = $branch->updatedBy;
+        $data['approved_by_user'] = $branch->approvedBy;
+        $data['printed_by_user'] = $branch->printedBy;
+
         return response()->json([
             'status' => 'success',
-            'data' => $branch,
+            'data' => $data,
         ]);
     }
 
