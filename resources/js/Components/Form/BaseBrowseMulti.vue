@@ -257,10 +257,20 @@ const handleCreate = () => {
     }
 };
 
-const handleRefresh = () => {
-    if (isDropdownOpen.value) {
-        dropdown.resetState();
-        dropdown.search = inputSearch.value;
+// --- Dropdown pagination ---
+
+const dropdownHasPages = computed(() => dropdown.lastPage > 1);
+
+const dropdownPrevPage = () => {
+    if (dropdown.currentPage > 1) {
+        dropdown.currentPage--;
+        dropdown.fetchData();
+    }
+};
+
+const dropdownNextPage = () => {
+    if (dropdown.currentPage < dropdown.lastPage) {
+        dropdown.currentPage++;
         dropdown.fetchData();
     }
 };
@@ -456,19 +466,6 @@ const containerClasses = computed(() => [
                     </svg>
                 </button>
 
-                <!-- Refresh button -->
-                <button
-                    type="button"
-                    class="inline-flex items-center border border-l-0 border-gray-300 bg-gray-50 px-2 text-gray-500 hover:bg-gray-100 hover:text-primary-600 focus:outline-none"
-                    :disabled="disabled"
-                    title="Refresh"
-                    @click="handleRefresh"
-                >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                </button>
-
                 <!-- Browse (magnifying glass) button -->
                 <button
                     type="button"
@@ -502,36 +499,64 @@ const containerClasses = computed(() => [
                 Tidak ada hasil
             </div>
             <!-- Results -->
-            <ul v-else class="max-h-60 overflow-auto py-1">
-                <li
-                    v-for="(row, index) in dropdown.data"
-                    :key="row[valueKey]"
-                    :data-index="index"
-                    class="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-sm transition-colors"
-                    :class="[
-                        highlightedIndex === index
-                            ? 'bg-primary-50 text-primary-700'
-                            : 'text-gray-900 hover:bg-gray-50',
-                    ]"
-                    @click="toggleRow(row)"
-                    @mouseenter="highlightedIndex = index"
-                >
-                    <!-- Checkmark -->
-                    <svg
-                        v-if="isRowSelected(row)"
-                        class="h-4 w-4 flex-shrink-0 text-primary-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+            <template v-else>
+                <ul class="max-h-60 overflow-auto py-1">
+                    <li
+                        v-for="(row, index) in dropdown.data"
+                        :key="row[valueKey]"
+                        :data-index="index"
+                        class="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-sm transition-colors"
+                        :class="[
+                            highlightedIndex === index
+                                ? 'bg-primary-50 text-primary-700'
+                                : 'text-gray-900 hover:bg-gray-50',
+                        ]"
+                        @click="toggleRow(row)"
+                        @mouseenter="highlightedIndex = index"
                     >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span v-else class="h-4 w-4 flex-shrink-0" />
-                    <span :class="{ 'font-medium': isRowSelected(row) }">
-                        {{ formatDropdownItem(row) }}
-                    </span>
-                </li>
-            </ul>
+                        <!-- Checkmark -->
+                        <svg
+                            v-if="isRowSelected(row)"
+                            class="h-4 w-4 flex-shrink-0 text-primary-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span v-else class="h-4 w-4 flex-shrink-0" />
+                        <span :class="{ 'font-medium': isRowSelected(row) }">
+                            {{ formatDropdownItem(row) }}
+                        </span>
+                    </li>
+                </ul>
+                <!-- Dropdown pagination -->
+                <div v-if="dropdownHasPages" class="flex items-center justify-between border-t border-gray-200 px-3 py-1.5">
+                    <span class="text-xs text-gray-500">Hal {{ dropdown.currentPage }} / {{ dropdown.lastPage }}</span>
+                    <div class="flex gap-1">
+                        <button
+                            type="button"
+                            class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
+                            :disabled="dropdown.currentPage <= 1"
+                            @click.stop="dropdownPrevPage"
+                        >
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
+                            :disabled="dropdown.currentPage >= dropdown.lastPage"
+                            @click.stop="dropdownNextPage"
+                        >
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </template>
         </div>
 
         <!-- Help text / Error -->
@@ -546,7 +571,7 @@ const containerClasses = computed(() => [
         <BaseModal
             v-model="isModalOpen"
             :title="config.title"
-            :size="config.modalSize ?? 'xl'"
+            :size="config.modalSize ?? 'full'"
         >
             <!-- Search input -->
             <div class="mb-4">

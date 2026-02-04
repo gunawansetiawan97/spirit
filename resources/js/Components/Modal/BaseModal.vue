@@ -4,7 +4,7 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 interface Props {
     modelValue: boolean;
     title?: string;
-    size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full';
     closable?: boolean;
     closeOnEscape?: boolean;
     closeOnOverlay?: boolean;
@@ -49,11 +49,15 @@ const handleOverlayClick = () => {
 };
 
 const sizeClasses = computed(() => {
-    const sizes = {
+    const sizes: Record<string, string> = {
         sm: 'max-w-sm',
         md: 'max-w-md',
         lg: 'max-w-lg',
         xl: 'max-w-xl',
+        '2xl': 'max-w-2xl',
+        '3xl': 'max-w-3xl',
+        '4xl': 'max-w-4xl',
+        '5xl': 'max-w-5xl',
         full: 'max-w-full mx-4',
     };
     return sizes[props.size];
