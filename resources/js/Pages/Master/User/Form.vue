@@ -51,6 +51,8 @@ const form = ref({
     is_active: true,
 });
 
+const branchRowData = ref<any>(null);
+
 const formErrors = ref<Record<string, string>>({});
 
 const pageTitle = computed(() => {
@@ -81,6 +83,7 @@ const fetchData = async () => {
             branch_id: data.branch?.id || null,
             is_active: data.is_active,
         };
+        branchRowData.value = data.branch || null;
     } catch (error: any) {
         console.error('Failed to fetch user:', error);
         alert('Gagal memuat data user');
@@ -205,6 +208,7 @@ onMounted(async () => {
                 <BaseBrowse
                     v-model="form.branch_id"
                     :config="branchBrowseConfig"
+                    :row-data="branchRowData"
                     label="Cabang"
                     placeholder="Pilih cabang..."
                     :error="formErrors.branch_id"

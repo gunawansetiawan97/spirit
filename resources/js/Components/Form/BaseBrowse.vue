@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import { useBrowse } from '@/Composables/useBrowse';
 import { BaseModal } from '@/Components/Modal';
 import TablePagination from '@/Components/Table/TablePagination.vue';
@@ -15,11 +15,14 @@ interface Props {
     required?: boolean;
     helpText?: string;
     id?: string;
+    /** Pre-loaded row data to skip resolve API call (useful in edit mode) */
+    rowData?: any;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     modelValue: null,
     placeholder: 'Pilih...',
+    rowData: undefined,
 });
 
 const emit = defineEmits<{
@@ -30,9 +33,9 @@ const emit = defineEmits<{
 
 const isModalOpen = ref(false);
 const localSearch = ref('');
-const searchInputRef = ref<HTMLInputElement | null>(null);
+const selectedRow = ref<any>(null);
 
-const browse = useBrowse(props.config);
+const browse = reactive(useBrowse(props.config));
 
 const valueKey = computed(() => props.config.valueKey ?? 'id');
 
@@ -54,9 +57,10 @@ const displayLabel = computed(() => {
     if (props.modelValue === null || props.modelValue === undefined || props.modelValue === '') {
         return '';
     }
-    const row = browse.resolvedRow.value;
-    if (!row) return browse.resolving.value ? 'Memuat...' : '';
-    return formatDisplay(row);
+    if (!selectedRow.value) {
+        return browse.resolving ? 'Memuat...' : '';
+    }
+    return formatDisplay(selectedRow.value);
 });
 
 // Get cell display value
@@ -69,7 +73,7 @@ const getCellDisplay = (row: any, col: BrowseColumn): string => {
 
 // Row number calculation
 const rowNumber = (index: number): number => {
-    return (browse.currentPage.value - 1) * browse.perPage.value + index + 1;
+    return (browse.currentPage - 1) * browse.perPage + index + 1;
 };
 
 // Check if row is currently selected
@@ -89,7 +93,7 @@ const openModal = () => {
 // Select a row
 const selectRow = (row: any) => {
     const value = row[valueKey.value];
-    browse.resolvedRow.value = row;
+    selectedRow.value = row;
     emit('update:modelValue', value);
     emit('change', value);
     emit('select', row);
@@ -99,7 +103,7 @@ const selectRow = (row: any) => {
 // Clear selection
 const clearSelection = (e: Event) => {
     e.stopPropagation();
-    browse.resolvedRow.value = null;
+    selectedRow.value = null;
     emit('update:modelValue', null);
     emit('change', null);
 };
@@ -120,15 +124,31 @@ const handlePageChange = (page: number) => {
     browse.handlePageChange(page);
 };
 
-// Resolve initial value
+// Watch rowData prop for pre-loaded data (edit mode)
+watch(
+    () => props.rowData,
+    (row) => {
+        if (row) {
+            selectedRow.value = row;
+        }
+    },
+    { immediate: true },
+);
+
+// Resolve initial value (for edit mode when rowData is not provided)
 watch(
     () => props.modelValue,
-    (newVal) => {
-        if (newVal !== null && newVal !== undefined && newVal !== '' && !browse.resolvedRow.value) {
-            browse.resolveValue(newVal);
-        }
+    async (newVal) => {
         if (newVal === null || newVal === undefined || newVal === '') {
-            browse.resolvedRow.value = null;
+            selectedRow.value = null;
+            return;
+        }
+        // Only resolve if we don't have the row data and no rowData prop
+        if (!selectedRow.value && !props.rowData) {
+            await browse.resolveValue(newVal);
+            if (browse.resolvedRow) {
+                selectedRow.value = browse.resolvedRow;
+            }
         }
     },
     { immediate: true },
@@ -212,7 +232,6 @@ const getAlignClass = (align?: string): string => {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input
-                        ref="searchInputRef"
                         v-model="localSearch"
                         type="text"
                         class="block w-full rounded-md border border-gray-300 py-2 pl-10 pr-10 text-sm placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
@@ -253,7 +272,7 @@ const getAlignClass = (align?: string): string => {
                     </thead>
                     <tbody class="divide-y divide-gray-200 bg-white">
                         <!-- Loading state -->
-                        <tr v-if="browse.loading.value">
+                        <tr v-if="browse.loading">
                             <td :colspan="config.columns.length + 1" class="px-3 py-8 text-center">
                                 <svg class="mx-auto h-6 w-6 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -263,14 +282,14 @@ const getAlignClass = (align?: string): string => {
                             </td>
                         </tr>
                         <!-- Empty state -->
-                        <tr v-else-if="browse.data.value.length === 0">
+                        <tr v-else-if="browse.data.length === 0">
                             <td :colspan="config.columns.length + 1" class="px-3 py-8 text-center text-sm text-gray-500">
                                 Tidak ada data
                             </td>
                         </tr>
                         <!-- Data rows -->
                         <tr
-                            v-for="(row, index) in browse.data.value"
+                            v-for="(row, index) in browse.data"
                             v-else
                             :key="row[valueKey]"
                             class="cursor-pointer transition-colors hover:bg-primary-50"
@@ -294,11 +313,11 @@ const getAlignClass = (align?: string): string => {
             </div>
 
             <!-- Pagination -->
-            <div v-if="browse.total.value > browse.perPage.value" class="mt-4">
+            <div v-if="browse.total > browse.perPage" class="mt-4">
                 <TablePagination
-                    :current-page="browse.currentPage.value"
-                    :per-page="browse.perPage.value"
-                    :total="browse.total.value"
+                    :current-page="browse.currentPage"
+                    :per-page="browse.perPage"
+                    :total="browse.total"
                     @update:current-page="handlePageChange"
                 />
             </div>
