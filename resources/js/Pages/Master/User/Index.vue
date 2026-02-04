@@ -47,7 +47,7 @@ const {
         { key: 'name', label: 'Nama', sortable: true },
         { key: 'email', label: 'Email', sortable: true },
         { key: 'role.name', label: 'Role' },
-        { key: 'branch.name', label: 'Cabang' },
+        { key: 'branches', label: 'Cabang', formatter: (value: any) => value?.map((b: any) => b.name).join(', ') || '-' },
         { key: 'is_active', label: 'Status', width: '100px', align: 'center', type: 'status' },
     ],
     filters: [
