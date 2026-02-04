@@ -37,6 +37,21 @@ class UserController extends Controller
         $query->orderBy($sortBy, $sortDirection);
 
         $perPage = $request->per_page ?? 10;
+
+        if ($perPage == -1) {
+            $all = $query->get();
+            return response()->json([
+                'status' => 'success',
+                'data' => $all,
+                'meta' => [
+                    'current_page' => 1,
+                    'per_page' => $all->count(),
+                    'total' => $all->count(),
+                    'last_page' => 1,
+                ],
+            ]);
+        }
+
         $users = $query->paginate($perPage);
 
         return response()->json([
