@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { BaseInput, BaseSelect, BaseButton } from '../Form';
-import type { SelectOption } from '@/types';
-
-interface FilterField {
-    key: string;
-    label: string;
-    type: 'text' | 'select' | 'date';
-    options?: SelectOption[];
-    placeholder?: string;
-}
+import type { FilterField } from '@/types';
 
 interface Props {
     fields: FilterField[];

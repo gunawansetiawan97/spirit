@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import TablePagination from './TablePagination.vue';
-import type { TableColumn, SortConfig } from '@/types';
+import TableFilter from './TableFilter.vue';
+import ActionButtons from './ActionButtons.vue';
+import { ConfirmDialog } from '@/Components/Modal';
+import { BaseButton } from '@/Components/Form';
+import { useAuthStore } from '@/stores/auth';
+import type { TableColumn, SortConfig, ActionConfig, CreateButtonConfig, DeleteDialogConfig, FilterField, ExportConfig } from '@/types';
 
 interface Props {
     columns: TableColumn[];
@@ -25,6 +30,19 @@ interface Props {
     searchValue?: string;
     // Empty state
     emptyText?: string;
+    // Actions
+    actions?: ActionConfig[];
+    // Create button
+    createButton?: CreateButtonConfig;
+    // Delete dialog
+    deleteDialog?: DeleteDialogConfig;
+    deleteLoading?: boolean;
+    // Filters
+    filters?: FilterField[];
+    filterValues?: Record<string, any>;
+    // Export
+    exportConfig?: ExportConfig;
+    exportLoading?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -41,6 +59,11 @@ const props = withDefaults(defineProps<Props>(), {
     searchPlaceholder: 'Cari...',
     searchValue: '',
     emptyText: 'Tidak ada data',
+    actions: () => [],
+    deleteLoading: false,
+    filters: () => [],
+    filterValues: () => ({}),
+    exportLoading: false,
 });
 
 const emit = defineEmits<{
@@ -51,7 +74,94 @@ const emit = defineEmits<{
     (e: 'search', value: string): void;
     (e: 'sort', value: SortConfig): void;
     (e: 'row-click', row: any): void;
+    (e: 'action-view', row: any): void;
+    (e: 'action-edit', row: any): void;
+    (e: 'action-delete', row: any): void;
+    (e: 'action-permissions', row: any): void;
+    (e: 'action-custom', row: any, action: ActionConfig): void;
+    (e: 'create'): void;
+    (e: 'delete-confirm', row: any): void;
+    (e: 'filter', values: Record<string, any>): void;
+    (e: 'filter-reset'): void;
+    (e: 'update:filterValues', values: Record<string, any>): void;
+    (e: 'export-excel'): void;
+    (e: 'export-pdf'): void;
 }>();
+
+const authStore = useAuthStore();
+
+const hasActions = computed(() => props.actions.length > 0 || !!slots.actions);
+const hasFilters = computed(() => props.filters.length > 0);
+
+const slots = defineSlots();
+
+// Filter state
+const showFilters = ref(false);
+
+const toggleFilters = () => {
+    showFilters.value = !showFilters.value;
+};
+
+const handleFilterSearch = () => {
+    emit('filter', props.filterValues);
+};
+
+const handleFilterReset = () => {
+    emit('filter-reset');
+};
+
+// Export permission check
+const canExport = computed(() => {
+    if (!props.exportConfig) return false;
+    if (!props.exportConfig.permission) return true;
+    return authStore.can('export', props.exportConfig.permission);
+});
+
+// Delete dialog state
+const showDeleteDialog = ref(false);
+const deletingItem = ref<any>(null);
+
+const canCreate = computed(() => {
+    if (!props.createButton) return false;
+    if (!props.createButton.permission) return true;
+    return authStore.can(props.createButton.action || 'create', props.createButton.permission);
+});
+
+const getDeleteMessage = computed(() => {
+    if (!props.deleteDialog || !deletingItem.value) return '';
+    if (typeof props.deleteDialog.message === 'function') {
+        return props.deleteDialog.message(deletingItem.value);
+    }
+    const itemLabel = props.deleteDialog.itemLabel || 'name';
+    return props.deleteDialog.message.replace('{name}', deletingItem.value[itemLabel] || '');
+});
+
+const handleDeleteClick = (row: any) => {
+    if (props.deleteDialog) {
+        deletingItem.value = row;
+        showDeleteDialog.value = true;
+    } else {
+        emit('action-delete', row);
+    }
+};
+
+const confirmDelete = () => {
+    if (deletingItem.value) {
+        emit('delete-confirm', deletingItem.value);
+    }
+};
+
+const closeDeleteDialog = () => {
+    showDeleteDialog.value = false;
+    deletingItem.value = null;
+};
+
+// Watch for deleteLoading to close dialog when delete completes
+watch(() => props.deleteLoading, (loading, prevLoading) => {
+    if (prevLoading && !loading) {
+        closeDeleteDialog();
+    }
+});
 
 const localSearch = ref(props.searchValue);
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -132,12 +242,35 @@ const getSortIcon = (column: TableColumn) => {
     return localSort.value.direction;
 };
 
-const getCellValue = (row: any, column: TableColumn) => {
-    const value = row[column.key];
+// Get value from nested key path (e.g., 'role.name')
+const getNestedValue = (obj: any, path: string): any => {
+    return path.split('.').reduce((current, key) => current?.[key], obj);
+};
+
+const getCellValue = (row: any, column: TableColumn): any => {
+    const value = getNestedValue(row, column.key);
     if (column.formatter) {
         return column.formatter(value, row);
     }
-    return value ?? '-';
+    return value;
+};
+
+const getCellDisplay = (row: any, column: TableColumn): string => {
+    const value = getCellValue(row, column);
+    return value ?? column.emptyText ?? '-';
+};
+
+const isStatusColumn = (column: TableColumn): boolean => {
+    return column.type === 'status';
+};
+
+const getStatusConfig = (column: TableColumn) => {
+    return {
+        activeText: column.statusConfig?.activeText ?? 'Aktif',
+        inactiveText: column.statusConfig?.inactiveText ?? 'Nonaktif',
+        activeClass: column.statusConfig?.activeClass ?? 'bg-success-100 text-success-800',
+        inactiveClass: column.statusConfig?.inactiveClass ?? 'bg-gray-100 text-gray-800',
+    };
 };
 
 const getAlignClass = (align?: string) => {
@@ -152,8 +285,8 @@ const getAlignClass = (align?: string) => {
 
 <template>
     <div class="w-full">
-        <!-- Search bar -->
-        <div v-if="searchable" class="mb-4 flex items-center gap-4">
+        <!-- Toolbar -->
+        <div v-if="searchable" class="mb-4 flex items-center gap-2">
             <div class="relative flex-1 max-w-md">
                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                     <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,7 +311,74 @@ const getAlignClass = (align?: string) => {
                     </svg>
                 </button>
             </div>
+            <!-- Filter toggle button -->
+            <button
+                v-if="hasFilters"
+                type="button"
+                class="inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors"
+                :class="showFilters
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'"
+                @click="toggleFilters"
+                title="Filter"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span class="ml-1.5">Filter</span>
+            </button>
+            <!-- Export Excel button -->
+            <button
+                v-if="canExport"
+                type="button"
+                class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-green-50 hover:border-green-500 hover:text-green-700"
+                :disabled="exportLoading"
+                @click="emit('export-excel')"
+                title="Export Excel"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span class="ml-1.5">Excel</span>
+            </button>
+            <!-- Export PDF button -->
+            <button
+                v-if="canExport"
+                type="button"
+                class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-red-50 hover:border-red-500 hover:text-red-700"
+                :disabled="exportLoading"
+                @click="emit('export-pdf')"
+                title="Export PDF"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <span class="ml-1.5">PDF</span>
+            </button>
+            <!-- Create button -->
+            <BaseButton
+                v-if="createButton && canCreate"
+                variant="primary"
+                class="ml-auto"
+                @click="emit('create')"
+            >
+                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                {{ createButton.label }}
+            </BaseButton>
             <slot name="toolbar" />
+        </div>
+
+        <!-- Filter panel -->
+        <div v-if="hasFilters && showFilters" class="mb-4">
+            <TableFilter
+                :fields="filters"
+                :model-value="filterValues"
+                @update:model-value="emit('update:filterValues', $event)"
+                @search="handleFilterSearch"
+                @reset="handleFilterReset"
+            />
         </div>
 
         <div class="overflow-x-auto rounded-lg border border-gray-200">
@@ -223,7 +423,7 @@ const getAlignClass = (align?: string) => {
                             </div>
                         </th>
                         <!-- Actions column -->
-                        <th v-if="$slots.actions" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600">
+                        <th v-if="hasActions" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-600">
                             Aksi
                         </th>
                     </tr>
@@ -231,7 +431,7 @@ const getAlignClass = (align?: string) => {
                 <tbody class="divide-y divide-gray-200 bg-white">
                     <!-- Loading state -->
                     <tr v-if="loading">
-                        <td :colspan="columns.length + (selectable ? 1 : 0) + ($slots.actions ? 1 : 0)" class="px-4 py-12 text-center">
+                        <td :colspan="columns.length + (selectable ? 1 : 0) + (hasActions ? 1 : 0)" class="px-4 py-12 text-center">
                             <div class="flex items-center justify-center">
                                 <svg class="h-8 w-8 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -243,7 +443,7 @@ const getAlignClass = (align?: string) => {
                     </tr>
                     <!-- Empty state -->
                     <tr v-else-if="data.length === 0">
-                        <td :colspan="columns.length + (selectable ? 1 : 0) + ($slots.actions ? 1 : 0)" class="px-4 py-12 text-center">
+                        <td :colspan="columns.length + (selectable ? 1 : 0) + (hasActions ? 1 : 0)" class="px-4 py-12 text-center">
                             <div class="flex flex-col items-center">
                                 <svg class="h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -278,12 +478,35 @@ const getAlignClass = (align?: string) => {
                             :class="getAlignClass(column.align)"
                         >
                             <slot :name="`cell-${column.key}`" :row="row" :value="getCellValue(row, column)">
-                                {{ getCellValue(row, column) }}
+                                <!-- Status cell type -->
+                                <template v-if="isStatusColumn(column)">
+                                    <span
+                                        class="inline-flex rounded-full px-2 py-1 text-xs font-semibold"
+                                        :class="getCellValue(row, column) ? getStatusConfig(column).activeClass : getStatusConfig(column).inactiveClass"
+                                    >
+                                        {{ getCellValue(row, column) ? getStatusConfig(column).activeText : getStatusConfig(column).inactiveText }}
+                                    </span>
+                                </template>
+                                <!-- Default text -->
+                                <template v-else>
+                                    {{ getCellDisplay(row, column) }}
+                                </template>
                             </slot>
                         </td>
                         <!-- Actions -->
-                        <td v-if="$slots.actions" class="whitespace-nowrap px-4 py-3 text-right text-sm" @click.stop>
-                            <slot name="actions" :row="row" :index="index" />
+                        <td v-if="hasActions" class="whitespace-nowrap px-4 py-3 text-right text-sm" @click.stop>
+                            <slot name="actions" :row="row" :index="index">
+                                <ActionButtons
+                                    v-if="actions.length > 0"
+                                    :row="row"
+                                    :actions="actions"
+                                    @view="emit('action-view', $event)"
+                                    @edit="emit('action-edit', $event)"
+                                    @delete="handleDeleteClick"
+                                    @permissions="emit('action-permissions', $event)"
+                                    @custom="emit('action-custom', $event, $event)"
+                                />
+                            </slot>
                         </td>
                     </tr>
                 </tbody>
@@ -300,5 +523,18 @@ const getAlignClass = (align?: string) => {
                 @update:per-page="emit('update:perPage', $event)"
             />
         </div>
+
+        <!-- Delete Dialog -->
+        <ConfirmDialog
+            v-if="deleteDialog"
+            v-model="showDeleteDialog"
+            :title="deleteDialog.title"
+            :message="getDeleteMessage"
+            variant="danger"
+            :confirm-text="deleteDialog.confirmText || 'Hapus'"
+            :loading="deleteLoading"
+            @confirm="confirmDelete"
+            @cancel="closeDeleteDialog"
+        />
     </div>
 </template>

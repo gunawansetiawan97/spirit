@@ -25,12 +25,24 @@ export interface FormField {
 }
 
 // Table Types
+export type CellType = 'text' | 'status' | 'date' | 'datetime' | 'number' | 'currency';
+
+export interface StatusConfig {
+    activeText?: string;
+    inactiveText?: string;
+    activeClass?: string;
+    inactiveClass?: string;
+}
+
 export interface TableColumn {
     key: string;
     label: string;
     sortable?: boolean;
     width?: string;
     align?: 'left' | 'center' | 'right';
+    type?: CellType;
+    statusConfig?: StatusConfig;
+    emptyText?: string;
     formatter?: (value: any, row: any) => string;
 }
 
@@ -61,6 +73,50 @@ export interface ConfirmDialogConfig {
     confirmText?: string;
     cancelText?: string;
     variant?: 'info' | 'warning' | 'danger';
+}
+
+// Action Button Types
+export type ActionType = 'view' | 'edit' | 'delete' | 'permissions' | 'custom';
+
+export interface ActionConfig {
+    type: ActionType;
+    permission?: string;
+    action?: string;
+    label?: string;
+    icon?: string;
+    color?: string;
+    show?: (row: any) => boolean;
+    onClick?: (row: any) => void;
+}
+
+// DataTable Config Types
+export interface CreateButtonConfig {
+    label: string;
+    permission?: string;
+    action?: string;
+}
+
+export interface DeleteDialogConfig {
+    title: string;
+    message: string | ((row: any) => string);
+    confirmText?: string;
+    itemLabel?: string;
+}
+
+// Filter Types
+export interface FilterField {
+    key: string;
+    label: string;
+    type: 'text' | 'select' | 'date';
+    options?: SelectOption[];
+    placeholder?: string;
+}
+
+// Export Types
+export interface ExportConfig {
+    filename: string;
+    title?: string;
+    permission?: string;
 }
 
 // API Response Types
