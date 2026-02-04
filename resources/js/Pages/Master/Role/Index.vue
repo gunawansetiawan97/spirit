@@ -1,15 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useUiStore } from '@/stores/ui';
-import { useAuthStore } from '@/stores/auth';
 import { DataTable } from '@/Components/Table';
-import { BaseButton } from '@/Components/Form';
-import { ConfirmDialog } from '@/Components/Modal';
-import type { TableColumn, ActionConfig } from '@/types';
+import type { TableColumn, ActionConfig, CreateButtonConfig, DeleteDialogConfig } from '@/types';
 import axios from 'axios';
 
 const uiStore = useUiStore();
-const authStore = useAuthStore();
 
 const emit = defineEmits<{
     (e: 'navigate', route: string): void;
@@ -22,11 +18,7 @@ const currentPage = ref(1);
 const perPage = ref(10);
 const total = ref(0);
 const search = ref('');
-
-// Delete dialog
-const showDeleteDialog = ref(false);
 const isDeleting = ref(false);
-const deletingItem = ref<any>(null);
 
 const columns: TableColumn[] = [
     { key: 'code', label: 'Kode', width: '120px', sortable: true },
@@ -42,6 +34,17 @@ const actions: ActionConfig[] = [
     { type: 'edit', permission: 'master.role', action: 'edit' },
     { type: 'delete', permission: 'master.role', action: 'delete' },
 ];
+
+const createButton: CreateButtonConfig = {
+    label: 'Tambah Role',
+    permission: 'master.role',
+    action: 'create',
+};
+
+const deleteDialog: DeleteDialogConfig = {
+    title: 'Hapus Role',
+    message: (row) => `Apakah Anda yakin ingin menghapus role '${row.name}'?`,
+};
 
 const fetchData = async () => {
     loading.value = true;
@@ -84,19 +87,10 @@ const navigateToPermissions = (row: any) => {
     emit('navigate', `/master/role/${row.uuid}/permissions`);
 };
 
-const openDeleteDialog = (row: any) => {
-    deletingItem.value = row;
-    showDeleteDialog.value = true;
-};
-
-const handleDelete = async () => {
-    if (!deletingItem.value) return;
-
+const handleDelete = async (row: any) => {
     isDeleting.value = true;
     try {
-        await axios.delete(`/api/roles/${deletingItem.value.uuid}`);
-        showDeleteDialog.value = false;
-        deletingItem.value = null;
+        await axios.delete(`/api/roles/${row.uuid}`);
         fetchData();
     } catch (error: any) {
         alert(error.response?.data?.message || 'Gagal menghapus role');
@@ -114,7 +108,6 @@ onMounted(() => {
 
 <template>
     <div class="space-y-4">
-        <!-- Table with search -->
         <div class="rounded-lg bg-white p-4 shadow">
             <DataTable
                 :columns="columns"
@@ -128,39 +121,19 @@ onMounted(() => {
                 :per-page="perPage"
                 :total="total"
                 :actions="actions"
+                :create-button="createButton"
+                :delete-dialog="deleteDialog"
+                :delete-loading="isDeleting"
                 @search="handleSearch"
                 @update:current-page="currentPage = $event; fetchData()"
                 @update:per-page="perPage = $event; currentPage = 1; fetchData()"
                 @row-click="navigateToView"
                 @action-view="navigateToView"
                 @action-edit="navigateToEdit"
-                @action-delete="openDeleteDialog"
                 @action-permissions="navigateToPermissions"
-            >
-                <template #toolbar>
-                    <BaseButton
-                        v-if="authStore.can('create', 'master.role')"
-                        variant="primary"
-                        @click="navigateToCreate"
-                    >
-                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Tambah Role
-                    </BaseButton>
-                </template>
-            </DataTable>
+                @create="navigateToCreate"
+                @delete-confirm="handleDelete"
+            />
         </div>
-
-        <!-- Delete Dialog -->
-        <ConfirmDialog
-            v-model="showDeleteDialog"
-            title="Hapus Role"
-            :message="`Apakah Anda yakin ingin menghapus role '${deletingItem?.name}'?`"
-            variant="danger"
-            confirm-text="Hapus"
-            :loading="isDeleting"
-            @confirm="handleDelete"
-        />
     </div>
 </template>

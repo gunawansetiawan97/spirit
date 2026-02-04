@@ -89,6 +89,20 @@ export interface ActionConfig {
     onClick?: (row: any) => void;
 }
 
+// DataTable Config Types
+export interface CreateButtonConfig {
+    label: string;
+    permission?: string;
+    action?: string;
+}
+
+export interface DeleteDialogConfig {
+    title: string;
+    message: string | ((row: any) => string);
+    confirmText?: string;
+    itemLabel?: string;
+}
+
 // API Response Types
 export interface ApiResponse<T = any> {
     data: T;

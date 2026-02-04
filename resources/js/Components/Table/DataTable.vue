@@ -2,7 +2,10 @@
 import { computed, ref, watch } from 'vue';
 import TablePagination from './TablePagination.vue';
 import ActionButtons from './ActionButtons.vue';
-import type { TableColumn, SortConfig, ActionConfig } from '@/types';
+import { ConfirmDialog } from '@/Components/Modal';
+import { BaseButton } from '@/Components/Form';
+import { useAuthStore } from '@/stores/auth';
+import type { TableColumn, SortConfig, ActionConfig, CreateButtonConfig, DeleteDialogConfig } from '@/types';
 
 interface Props {
     columns: TableColumn[];
@@ -28,6 +31,11 @@ interface Props {
     emptyText?: string;
     // Actions
     actions?: ActionConfig[];
+    // Create button
+    createButton?: CreateButtonConfig;
+    // Delete dialog
+    deleteDialog?: DeleteDialogConfig;
+    deleteLoading?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -45,6 +53,7 @@ const props = withDefaults(defineProps<Props>(), {
     searchValue: '',
     emptyText: 'Tidak ada data',
     actions: () => [],
+    deleteLoading: false,
 });
 
 const emit = defineEmits<{
@@ -60,11 +69,61 @@ const emit = defineEmits<{
     (e: 'action-delete', row: any): void;
     (e: 'action-permissions', row: any): void;
     (e: 'action-custom', row: any, action: ActionConfig): void;
+    (e: 'create'): void;
+    (e: 'delete-confirm', row: any): void;
 }>();
+
+const authStore = useAuthStore();
 
 const hasActions = computed(() => props.actions.length > 0 || !!slots.actions);
 
 const slots = defineSlots();
+
+// Delete dialog state
+const showDeleteDialog = ref(false);
+const deletingItem = ref<any>(null);
+
+const canCreate = computed(() => {
+    if (!props.createButton) return false;
+    if (!props.createButton.permission) return true;
+    return authStore.can(props.createButton.action || 'create', props.createButton.permission);
+});
+
+const getDeleteMessage = computed(() => {
+    if (!props.deleteDialog || !deletingItem.value) return '';
+    if (typeof props.deleteDialog.message === 'function') {
+        return props.deleteDialog.message(deletingItem.value);
+    }
+    const itemLabel = props.deleteDialog.itemLabel || 'name';
+    return props.deleteDialog.message.replace('{name}', deletingItem.value[itemLabel] || '');
+});
+
+const handleDeleteClick = (row: any) => {
+    if (props.deleteDialog) {
+        deletingItem.value = row;
+        showDeleteDialog.value = true;
+    } else {
+        emit('action-delete', row);
+    }
+};
+
+const confirmDelete = () => {
+    if (deletingItem.value) {
+        emit('delete-confirm', deletingItem.value);
+    }
+};
+
+const closeDeleteDialog = () => {
+    showDeleteDialog.value = false;
+    deletingItem.value = null;
+};
+
+// Watch for deleteLoading to close dialog when delete completes
+watch(() => props.deleteLoading, (loading, prevLoading) => {
+    if (prevLoading && !loading) {
+        closeDeleteDialog();
+    }
+});
 
 const localSearch = ref(props.searchValue);
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -214,6 +273,17 @@ const getAlignClass = (align?: string) => {
                     </svg>
                 </button>
             </div>
+            <!-- Create button -->
+            <BaseButton
+                v-if="createButton && canCreate"
+                variant="primary"
+                @click="emit('create')"
+            >
+                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                {{ createButton.label }}
+            </BaseButton>
             <slot name="toolbar" />
         </div>
 
@@ -338,7 +408,7 @@ const getAlignClass = (align?: string) => {
                                     :actions="actions"
                                     @view="emit('action-view', $event)"
                                     @edit="emit('action-edit', $event)"
-                                    @delete="emit('action-delete', $event)"
+                                    @delete="handleDeleteClick"
                                     @permissions="emit('action-permissions', $event)"
                                     @custom="emit('action-custom', $event, $event)"
                                 />
@@ -359,5 +429,18 @@ const getAlignClass = (align?: string) => {
                 @update:per-page="emit('update:perPage', $event)"
             />
         </div>
+
+        <!-- Delete Dialog -->
+        <ConfirmDialog
+            v-if="deleteDialog"
+            v-model="showDeleteDialog"
+            :title="deleteDialog.title"
+            :message="getDeleteMessage"
+            variant="danger"
+            :confirm-text="deleteDialog.confirmText || 'Hapus'"
+            :loading="deleteLoading"
+            @confirm="confirmDelete"
+            @cancel="closeDeleteDialog"
+        />
     </div>
 </template>
