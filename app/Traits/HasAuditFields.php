@@ -15,6 +15,18 @@ trait HasAuditFields
 {
     use SoftDeletes;
 
+    /** Cache for Schema::hasColumn() results */
+    protected static array $columnExistsCache = [];
+
+    protected static function tableHasColumn(string $table, string $column): bool
+    {
+        $key = "{$table}.{$column}";
+        if (!isset(static::$columnExistsCache[$key])) {
+            static::$columnExistsCache[$key] = Schema::hasColumn($table, $column);
+        }
+        return static::$columnExistsCache[$key];
+    }
+
     public static function bootHasAuditFields(): void
     {
         static::created(function ($model) {
@@ -24,8 +36,7 @@ trait HasAuditFields
         static::creating(function ($model) {
             if (Auth::check()) {
                 $model->created_by = Auth::id();
-                // Only set branch_id if the table has this column
-                if (Schema::hasColumn($model->getTable(), 'branch_id')) {
+                if (static::tableHasColumn($model->getTable(), 'branch_id')) {
                     $model->branch_id = $model->branch_id ?? Auth::user()->branch_id;
                 }
             }
