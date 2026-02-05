@@ -1,26 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, markRaw, h } from 'vue';
+import { ref, onMounted, computed, markRaw, defineAsyncComponent } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useUiStore } from '@/stores/ui';
 import { AppLayout } from '@/Components/Layout';
 import Login from '@/Pages/Auth/Login.vue';
 import Dashboard from '@/Pages/Dashboard.vue';
 
-// Master pages
-import RoleIndex from '@/Pages/Master/Role/Index.vue';
-import RoleForm from '@/Pages/Master/Role/Form.vue';
-import RolePermission from '@/Pages/Master/Role/Permission.vue';
-import UserIndex from '@/Pages/Master/User/Index.vue';
-import UserForm from '@/Pages/Master/User/Form.vue';
-import BranchIndex from '@/Pages/Master/Branch/Index.vue';
-import BranchForm from '@/Pages/Master/Branch/Form.vue';
+// Master pages - lazy loaded
+const RoleIndex = defineAsyncComponent(() => import('@/Pages/Master/Role/Index.vue'));
+const RoleForm = defineAsyncComponent(() => import('@/Pages/Master/Role/Form.vue'));
+const RolePermission = defineAsyncComponent(() => import('@/Pages/Master/Role/Permission.vue'));
+const UserIndex = defineAsyncComponent(() => import('@/Pages/Master/User/Index.vue'));
+const UserForm = defineAsyncComponent(() => import('@/Pages/Master/User/Form.vue'));
+const BranchIndex = defineAsyncComponent(() => import('@/Pages/Master/Branch/Index.vue'));
+const BranchForm = defineAsyncComponent(() => import('@/Pages/Master/Branch/Form.vue'));
 
 const authStore = useAuthStore();
-const uiStore = useUiStore();
 
 const isInitialized = ref(false);
 const currentRoute = ref('/dashboard');
-const routeParams = ref<Record<string, string>>({});
 
 // Route patterns with parameter matching
 interface RouteConfig {

@@ -64,20 +64,23 @@ const fetchOptions = async () => {
     }
 };
 
-onMounted(async () => {
+onMounted(() => {
     setupPage();
-    await fetchOptions();
-    await fetchData((data) => {
-        form.value = {
-            name: data.name,
-            email: data.email,
-            password: '',
-            role_id: data.role?.id || null,
-            branch_ids: data.branches?.map((b: any) => b.id) || [],
-            is_active: data.is_active,
-        };
-        branchRowsData.value = data.branches || [];
-    });
+    // Run both API calls in parallel
+    Promise.all([
+        fetchOptions(),
+        fetchData((data) => {
+            form.value = {
+                name: data.name,
+                email: data.email,
+                password: '',
+                role_id: data.role?.id || null,
+                branch_ids: data.branches?.map((b: any) => b.id) || [],
+                is_active: data.is_active,
+            };
+            branchRowsData.value = data.branches || [];
+        }),
+    ]);
 });
 
 const onSubmit = () => handleSubmit(() => {
