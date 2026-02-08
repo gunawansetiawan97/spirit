@@ -12,7 +12,7 @@ class RoleSeeder extends Seeder
     public function run(): void
     {
         // Create Administrator role with full access
-        $admin = Role::create([
+        $admin = Role::updateOrCreate([
             'code' => 'ADMIN',
             'name' => 'Administrator',
             'description' => 'Full access to all features',
@@ -22,7 +22,7 @@ class RoleSeeder extends Seeder
         // Give admin all permissions with full access
         $permissions = Permission::all();
         foreach ($permissions as $permission) {
-            RolePermission::create([
+            RolePermission::updateOrCreate([
                 'role_id' => $admin->id,
                 'permission_id' => $permission->id,
                 'can_view' => true,
@@ -36,7 +36,7 @@ class RoleSeeder extends Seeder
         }
 
         // Create Manager role
-        $manager = Role::create([
+        $manager = Role::updateOrCreate([
             'code' => 'MANAGER',
             'name' => 'Manager',
             'description' => 'Can manage most features but limited delete/approve',
@@ -44,7 +44,7 @@ class RoleSeeder extends Seeder
         ]);
 
         foreach ($permissions as $permission) {
-            RolePermission::create([
+            RolePermission::updateOrCreate([
                 'role_id' => $manager->id,
                 'permission_id' => $permission->id,
                 'can_view' => true,
@@ -58,7 +58,7 @@ class RoleSeeder extends Seeder
         }
 
         // Create Staff role
-        $staff = Role::create([
+        $staff = Role::updateOrCreate([
             'code' => 'STAFF',
             'name' => 'Staff',
             'description' => 'Basic access for daily operations',
@@ -71,7 +71,7 @@ class RoleSeeder extends Seeder
         ])->get();
 
         foreach ($staffPermissions as $permission) {
-            RolePermission::create([
+            RolePermission::updateOrCreate([
                 'role_id' => $staff->id,
                 'permission_id' => $permission->id,
                 'can_view' => true,

@@ -9,4 +9,5 @@ export { default as FormGroup } from './FormGroup.vue';
 export { default as FormPage } from './FormPage.vue';
 export { default as BaseBrowse } from './BaseBrowse.vue';
 export { default as BaseBrowseMulti } from './BaseBrowseMulti.vue';
+export { default as BaseGrid } from './BaseGrid.vue';
 export { default as AuditInfo } from './AuditInfo.vue';

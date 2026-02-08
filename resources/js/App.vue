@@ -14,6 +14,15 @@ const UserForm = defineAsyncComponent(() => import('@/Pages/Master/User/Form.vue
 const BranchIndex = defineAsyncComponent(() => import('@/Pages/Master/Branch/Index.vue'));
 const BranchForm = defineAsyncComponent(() => import('@/Pages/Master/Branch/Form.vue'));
 
+const AccountTypeIndex = defineAsyncComponent(() => import('@/Pages/Master/AccountType/Index.vue'));
+const AccountTypeForm = defineAsyncComponent(() => import('@/Pages/Master/AccountType/Form.vue'));
+const AccountGroupIndex = defineAsyncComponent(() => import('@/Pages/Master/AccountGroup/Index.vue'));
+const AccountGroupForm = defineAsyncComponent(() => import('@/Pages/Master/AccountGroup/Form.vue'));
+const CoaIndex = defineAsyncComponent(() => import('@/Pages/Master/Coa/Index.vue'));
+const CoaForm = defineAsyncComponent(() => import('@/Pages/Master/Coa/Form.vue'));
+const CoaMappingIndex = defineAsyncComponent(() => import('@/Pages/Master/CoaMapping/Index.vue'));
+const CoaMappingForm = defineAsyncComponent(() => import('@/Pages/Master/CoaMapping/Form.vue'));
+
 const authStore = useAuthStore();
 
 const isInitialized = ref(false);
@@ -44,6 +53,22 @@ const routePatterns: RouteConfig[] = [
     { pattern: /^\/master\/branch\/create$/, component: BranchForm, getProps: () => ({ mode: 'create' }) },
     { pattern: new RegExp(`^/master/branch/(${UUID_PATTERN})$`), component: BranchForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
     { pattern: new RegExp(`^/master/branch/(${UUID_PATTERN})/edit$`), component: BranchForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
+    { pattern: /^\/master\/account-type$/, component: AccountTypeIndex },
+    { pattern: /^\/master\/account-type\/create$/, component: AccountTypeForm, getProps: () => ({ mode: 'create' }) },
+    { pattern: new RegExp(`^/master/account-type/(${UUID_PATTERN})$`), component: AccountTypeForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
+    { pattern: new RegExp(`^/master/account-type/(${UUID_PATTERN})/edit$`), component: AccountTypeForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
+    { pattern: /^\/master\/account-group$/, component: AccountGroupIndex },
+    { pattern: /^\/master\/account-group\/create$/, component: AccountGroupForm, getProps: () => ({ mode: 'create' }) },
+    { pattern: new RegExp(`^/master/account-group/(${UUID_PATTERN})$`), component: AccountGroupForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
+    { pattern: new RegExp(`^/master/account-group/(${UUID_PATTERN})/edit$`), component: AccountGroupForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
+    { pattern: /^\/master\/coa$/, component: CoaIndex },
+    { pattern: /^\/master\/coa\/create$/, component: CoaForm, getProps: () => ({ mode: 'create' }) },
+    { pattern: new RegExp(`^/master/coa/(${UUID_PATTERN})$`), component: CoaForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
+    { pattern: new RegExp(`^/master/coa/(${UUID_PATTERN})/edit$`), component: CoaForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
+    { pattern: /^\/master\/coa-mapping$/, component: CoaMappingIndex },
+    { pattern: /^\/master\/coa-mapping\/create$/, component: CoaMappingForm, getProps: () => ({ mode: 'create' }) },
+    { pattern: new RegExp(`^/master/coa-mapping/(${UUID_PATTERN})$`), component: CoaMappingForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
+    { pattern: new RegExp(`^/master/coa-mapping/(${UUID_PATTERN})/edit$`), component: CoaMappingForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
 ];
 
 const matchRoute = (path: string): { component: any; props: Record<string, any> } => {

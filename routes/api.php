@@ -7,6 +7,10 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ActivityLogController;
+use App\Http\Controllers\Api\AccountTypeController;
+use App\Http\Controllers\Api\AccountGroupController;
+use App\Http\Controllers\Api\ChartOfAccountController;
+use App\Http\Controllers\Api\CoaMappingController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -36,6 +40,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/permissions/tree', [PermissionController::class, 'tree']);
     Route::get('/permissions/parents', [PermissionController::class, 'parents']);
     Route::apiResource('/permissions', PermissionController::class);
+
+    
+    // Account Types
+    Route::get('/account-types/list', [AccountTypeController::class, 'all']);
+    Route::apiResource('/account-types', AccountTypeController::class);
+
+    // Account Groups
+    Route::get('/account-groups/list', [AccountGroupController::class, 'all']);
+    Route::apiResource('/account-groups', AccountGroupController::class);
+
+    // Chart of Accounts
+    Route::get('/chart-of-accounts/list', [ChartOfAccountController::class, 'all']);
+    Route::apiResource('/chart-of-accounts', ChartOfAccountController::class);
+
+    // COA Mappings
+    Route::apiResource('/coa-mappings', CoaMappingController::class);
 
     // Activity Logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);

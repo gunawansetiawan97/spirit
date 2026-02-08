@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { FormPage, AuditInfo } from '@/Components/Form';
-import { BaseInput, BaseSelect, BaseCheckbox, BaseBrowseMulti } from '@/Components/Form';
+import { BaseInput, BaseSelect, BaseCheckbox, BaseGrid, BaseBrowse } from '@/Components/Form';
 import { useFormPage } from '@/Composables';
 import type { SelectOption, BrowseConfig } from '@/types';
 import axios from 'axios';
@@ -49,11 +49,11 @@ const form = ref({
     email: '',
     password: '',
     role_id: null as number | null,
-    branch_ids: [] as number[],
     is_active: true,
 });
 
-const branchRowsData = ref<any[]>([]);
+const branchRows = ref<{ branch_id: number | null }[]>([]);
+const branchRowDataMap = ref<Record<number, any>>({});
 
 const fetchOptions = async () => {
     try {
@@ -75,19 +75,22 @@ onMounted(() => {
                 email: data.email,
                 password: '',
                 role_id: data.role?.id || null,
-                branch_ids: data.branches?.map((b: any) => b.id) || [],
                 is_active: data.is_active,
             };
-            branchRowsData.value = data.branches || [];
+            branchRows.value = data.branches?.map((b: any) => ({ branch_id: b.id })) || [];
+            data.branches?.forEach((b: any) => { branchRowDataMap.value[b.id] = b; });
         }),
     ]);
 });
 
 const onSubmit = () => handleSubmit(() => {
-    const payload = { ...form.value };
+    const payload: any = { ...form.value };
     if (props.mode === 'edit' && !payload.password) {
-        delete (payload as any).password;
+        delete payload.password;
     }
+    payload.branch_ids = branchRows.value
+        .map(r => r.branch_id)
+        .filter(Boolean);
     return payload;
 });
 </script>
@@ -147,17 +150,28 @@ const onSubmit = () => handleSubmit(() => {
                 />
 
                 <div class="md:col-span-2">
-                    <BaseBrowseMulti
-                        v-model="form.branch_ids"
-                        :config="branchBrowseConfig"
-                        :rows-data="branchRowsData"
-                        label="Cabang"
-                        placeholder="Pilih cabang..."
-                        :error="formErrors.branch_ids"
+                    <BaseGrid
+                        v-model="branchRows"
+                        :columns="[{ key: 'branch_id', label: 'Cabang' }]"
+                        title="Cabang"
                         :disabled="readonly"
-                        required
-                        @navigate="(route: string) => emit('navigate', route)"
-                    />
+                        :new-row="() => ({ branch_id: null })"
+                        :error="formErrors.branch_ids"
+                        :unique-keys="['branch_id']"
+                        :required-keys="['branch_id']"
+                    >
+                        <template #cell-branch_id="{ row, index, disabled }">
+                            <BaseBrowse
+                                :modelValue="row.branch_id"
+                                @update:modelValue="(val: any) => row.branch_id = val"
+                                :config="branchBrowseConfig"
+                                :row-data="branchRowDataMap[row.branch_id]"
+                                :disabled="disabled"
+                                @select="(rowData: any) => branchRowDataMap[rowData.id] = rowData"
+                                @navigate="(route: string) => emit('navigate', route)"
+                            />
+                        </template>
+                    </BaseGrid>
                 </div>
 
                 <div class="md:col-span-2">
