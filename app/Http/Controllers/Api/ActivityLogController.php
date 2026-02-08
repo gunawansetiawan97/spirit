@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ActivityLogController extends Controller
 {
@@ -15,14 +16,8 @@ class ActivityLogController extends Controller
             'loggable_id' => 'required|integer',
         ]);
 
-        // Map short names to full model class
-        $typeMap = [
-            'branch' => 'App\\Models\\Branch',
-            'user' => 'App\\Models\\User',
-            'role' => 'App\\Models\\Role',
-        ];
-
-        $loggableType = $typeMap[$request->loggable_type] ?? $request->loggable_type;
+        // Convert short name (e.g. 'account_group') to full model class (e.g. 'App\Models\AccountGroup')
+        $loggableType = 'App\\Models\\' . Str::studly($request->loggable_type);
 
         $logs = ActivityLog::with('user:id,name')
             ->where('loggable_type', $loggableType)

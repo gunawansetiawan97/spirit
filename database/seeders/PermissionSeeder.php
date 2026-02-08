@@ -42,6 +42,18 @@ class PermissionSeeder extends Seeder
                             ['code' => 'master.accounting.coa_mapping', 'name' => 'COA Mapping', 'route' => '/master/coa-mapping', 'sort_order' => 4],
                         ]
                     ],
+                    [
+                        'code' => 'master.product',
+                        'name' => 'Produk',
+                        'route' => null,
+                        'sort_order' => 6,
+                        'children' => [
+                            ['code' => 'master.product.unit', 'name' => 'Unit', 'route' => '/master/unit', 'sort_order' => 1],
+                            ['code' => 'master.product.product_category', 'name' => 'Kategori Produk', 'route' => '/master/product-category', 'sort_order' => 2],
+                            ['code' => 'master.product.product_brand', 'name' => 'Merk Produk', 'route' => '/master/product-brand', 'sort_order' => 3],
+                            ['code' => 'master.product.product', 'name' => 'Produk', 'route' => '/master/product', 'sort_order' => 4], 
+                        ]
+                    ],
                 ],
             ],
             [

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\UnitController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
@@ -56,6 +57,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // COA Mappings
     Route::apiResource('/coa-mappings', CoaMappingController::class);
+
+    
+    
+    // Units
+    Route::get('/units/list', [UnitController::class, 'all']);
+    Route::apiResource('/units', UnitController::class);
 
     // Activity Logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);
