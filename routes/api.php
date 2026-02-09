@@ -12,6 +12,10 @@ use App\Http\Controllers\Api\AccountTypeController;
 use App\Http\Controllers\Api\AccountGroupController;
 use App\Http\Controllers\Api\ChartOfAccountController;
 use App\Http\Controllers\Api\CoaMappingController;
+use App\Http\Controllers\Api\NumberSequenceController;
+use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProductCategoryController;
+use App\Http\Controllers\Api\ProductBrandController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -63,6 +67,26 @@ Route::middleware('auth:sanctum')->group(function () {
     // Units
     Route::get('/units/list', [UnitController::class, 'all']);
     Route::apiResource('/units', UnitController::class);
+
+    // Number Sequences
+    Route::get('/number-sequences/list', [NumberSequenceController::class, 'all']);
+    Route::get('/number-sequences/peek-by-code', [NumberSequenceController::class, 'peekByCode']);
+    Route::post('/number-sequences/preview-format', [NumberSequenceController::class, 'previewFormat']);
+    Route::post('/number-sequences/{number_sequence}/peek', [NumberSequenceController::class, 'peek']);
+    Route::post('/number-sequences/{number_sequence}/generate', [NumberSequenceController::class, 'generate']);
+    Route::apiResource('/number-sequences', NumberSequenceController::class);
+
+    // Product Categories
+    Route::get('/product-categories/list', [ProductCategoryController::class, 'all']);
+    Route::apiResource('/product-categories', ProductCategoryController::class);
+
+    // Product Brands
+    Route::get('/product-brands/list', [ProductBrandController::class, 'all']);
+    Route::apiResource('/product-brands', ProductBrandController::class);
+
+    // Products
+    Route::get('/products/list', [ProductController::class, 'all']);
+    Route::apiResource('/products', ProductController::class);
 
     // Activity Logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);

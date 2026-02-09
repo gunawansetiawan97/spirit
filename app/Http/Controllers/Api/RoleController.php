@@ -6,75 +6,28 @@ use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\Permission;
 use App\Models\RolePermission;
+use App\Traits\HasIndexQuery;
 use Illuminate\Http\Request;
 
 class RoleController extends Controller
 {
+    use HasIndexQuery;
+
     public function index(Request $request)
     {
-        $query = Role::withCount('users');
-
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('code', 'like', "%{$request->search}%")
-                    ->orWhere('name', 'like', "%{$request->search}%");
-            });
-        }
-
-        if ($request->is_active !== null) {
-            $query->where('is_active', $request->is_active);
-        }
-
-        $sortBy = $request->sort_by ?? 'name';
-        $sortDirection = $request->sort_direction ?? 'asc';
-        $query->orderBy($sortBy, $sortDirection);
-
-        $perPage = $request->per_page ?? 10;
-
-        if ($perPage == -1) {
-            $all = $query->get();
-            return response()->json([
-                'status' => 'success',
-                'data' => $all,
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => $all->count(),
-                    'total' => $all->count(),
-                    'last_page' => 1,
-                ],
-            ]);
-        }
-
-        $roles = $query->paginate($perPage);
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $roles->items(),
-            'meta' => [
-                'current_page' => $roles->currentPage(),
-                'per_page' => $roles->perPage(),
-                'total' => $roles->total(),
-                'last_page' => $roles->lastPage(),
-            ],
+        return $this->paginatedResponse(Role::withCount('users'), $request, [
+            'searchFields' => ['code', 'name'],
+            'defaultSort' => 'name',
         ]);
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'code' => 'required|string|max:20|unique:roles,code',
-            'name' => 'required|string|max:100',
-            'description' => 'nullable|string',
-            'is_active' => 'boolean',
-        ]);
+        $request->validate(Role::storeRules());
 
         $role = Role::create($request->only(['code', 'name', 'description', 'is_active']));
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Role berhasil dibuat',
-            'data' => $role,
-        ], 201);
+        return $this->storeResponse($role);
     }
 
     public function show(Role $role)
@@ -89,20 +42,11 @@ class RoleController extends Controller
 
     public function update(Request $request, Role $role)
     {
-        $request->validate([
-            'code' => 'required|string|max:20|unique:roles,code,' . $role->id,
-            'name' => 'required|string|max:100',
-            'description' => 'nullable|string',
-            'is_active' => 'boolean',
-        ]);
+        $request->validate(Role::updateRules($role->id));
 
         $role->update($request->only(['code', 'name', 'description', 'is_active']));
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Role berhasil diupdate',
-            'data' => $role,
-        ]);
+        return $this->updateResponse($role);
     }
 
     public function destroy(Role $role)
@@ -116,10 +60,7 @@ class RoleController extends Controller
 
         $role->delete();
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Role berhasil dihapus',
-        ]);
+        return $this->destroyResponse($role);
     }
 
     public function all()
@@ -174,10 +115,8 @@ class RoleController extends Controller
             'permissions.*.can_export' => 'boolean',
         ]);
 
-        // Delete existing permissions
         RolePermission::where('role_id', $role->id)->delete();
 
-        // Insert new permissions
         foreach ($request->permissions as $perm) {
             if ($perm['can_view'] ?? false) {
                 RolePermission::create([

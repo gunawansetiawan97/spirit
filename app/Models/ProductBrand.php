@@ -2,17 +2,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use App\Traits\HasAuditFields;
 use App\Traits\HasUuid;
 use App\Traits\HasValidation;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
-class Unit extends Model
+class ProductBrand extends Model
 {
     use HasFactory, HasAuditFields, HasUuid, HasValidation;
 
-    public static string $label = 'Unit';
+    public static string $label = 'Merk Produk';
 
     protected $fillable = [
         'code',
@@ -21,18 +21,19 @@ class Unit extends Model
         'is_active',
     ];
 
-    public static function validationRules(): array
-    {
-        return [
-            'code' => 'required|string|max:20|unique:units,code',
-            'name' => 'required|string|max:100',
-            'is_active' => 'boolean',
-        ];
-    }
-
     protected $casts = [
         'is_active' => 'boolean',
         'approved_at' => 'datetime',
         'printed_at' => 'datetime',
-    ];  
+    ];
+
+    public static function validationRules(): array
+    {
+        return [
+            'code' => 'nullable|string|max:20|unique:product_brands,code',
+            'name' => 'required|string|max:100',
+            'description' => 'nullable|string',
+            'is_active' => 'boolean',
+        ];
+    }
 }

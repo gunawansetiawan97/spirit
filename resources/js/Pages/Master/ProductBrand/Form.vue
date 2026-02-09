@@ -17,18 +17,17 @@ const {
     loading, saving, formErrors, activeTab, auditData, recordId,
     formTabs, pageTitle, setupPage, fetchData, handleSubmit, handleBack, handleEdit,
 } = useFormPage({
-    title: 'Cabang',
-    apiEndpoint: '/api/branches',
-    basePath: '/master/branch',
-    auditType: 'branch',
-    auditRelations: ['createdBy', 'updatedBy', 'approvedBy', 'printedBy'],
+    title: 'Merk Produk',
+    apiEndpoint: '/api/product-brands',
+    basePath: '/master/product-brand',
+    auditType: 'product-brand',
+    auditRelations: ['createdBy', 'updatedBy'],
 }, props, emit);
 
 const form = ref({
     code: '',
     name: '',
-    address: '',
-    phone: '',
+    description: '',
     is_active: true,
 });
 
@@ -48,8 +47,7 @@ onMounted(async () => {
         form.value = {
             code: data.code,
             name: data.name,
-            address: data.address || '',
-            phone: data.phone || '',
+            description: data.description || '',
             is_active: data.is_active,
         };
     });
@@ -83,7 +81,6 @@ const onSubmit = () => handleSubmit(() => ({
                 <BaseInput
                     v-model="form.code"
                     label="Kode"
-                    :placeholder="autoCode ? '' : 'Masukkan kode cabang'"
                     :help-text="autoCode ? 'Kode otomatis (nomor final bisa berbeda)' : ''"
                     :error="formErrors.code"
                     :disabled="readonly || autoCode || mode === 'edit'"
@@ -92,26 +89,18 @@ const onSubmit = () => handleSubmit(() => ({
                 <BaseInput
                     v-model="form.name"
                     label="Nama"
-                    placeholder="Masukkan nama cabang"
+                    placeholder="Masukkan nama merk"
                     :error="formErrors.name"
                     :disabled="readonly"
                     required
                 />
 
-                <BaseInput
-                    v-model="form.phone"
-                    label="Telepon"
-                    placeholder="Masukkan nomor telepon"
-                    :error="formErrors.phone"
-                    :disabled="readonly"
-                />
-
                 <div class="md:col-span-2">
                     <BaseTextarea
-                        v-model="form.address"
-                        label="Alamat"
-                        placeholder="Masukkan alamat cabang"
-                        :error="formErrors.address"
+                        v-model="form.description"
+                        label="Deskripsi"
+                        placeholder="Masukkan deskripsi merk"
+                        :error="formErrors.description"
                         :disabled="readonly"
                         :rows="3"
                     />
@@ -129,7 +118,7 @@ const onSubmit = () => handleSubmit(() => ({
 
         <template v-if="recordId" #tab-info>
             <AuditInfo
-                loggable-type="branch"
+                loggable-type="product-brand"
                 :loggable-id="recordId"
                 :audit-data="auditData"
             />

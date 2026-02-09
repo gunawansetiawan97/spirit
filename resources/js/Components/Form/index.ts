@@ -11,3 +11,4 @@ export { default as BaseBrowse } from './BaseBrowse.vue';
 export { default as BaseBrowseMulti } from './BaseBrowseMulti.vue';
 export { default as BaseGrid } from './BaseGrid.vue';
 export { default as AuditInfo } from './AuditInfo.vue';
+export { default as BaseImageUpload } from './BaseImageUpload.vue';

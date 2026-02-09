@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasUuid;
+use App\Traits\HasValidation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -15,7 +16,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, HasUuid;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, HasUuid, HasValidation;
+
+    public static string $label = 'User';
 
     protected $fillable = [
         'name',
@@ -25,6 +28,28 @@ class User extends Authenticatable
         'branch_id',
         'is_active',
     ];
+
+    public static function validationRules(): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'role_id' => 'required|exists:roles,id',
+            'branch_ids' => 'required|array|min:1',
+            'branch_ids.*' => 'exists:branches,id',
+            'is_active' => 'boolean',
+        ];
+    }
+
+    public static function contextualRules(): array
+    {
+        return [
+            'password' => [
+                'store' => 'required|string|min:6',
+                'update' => 'nullable|string|min:6',
+            ],
+        ];
+    }
 
     protected $hidden = [
         'password',

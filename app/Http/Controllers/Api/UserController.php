@@ -4,81 +4,35 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Traits\HasIndexQuery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
+    use HasIndexQuery;
+
     public function index(Request $request)
     {
         $query = User::with(['role:id,uuid,code,name', 'branches:id,uuid,code,name']);
 
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('name', 'like', "%{$request->search}%")
-                    ->orWhere('email', 'like', "%{$request->search}%");
-            });
-        }
-
-        if ($request->role_id) {
-            $query->where('role_id', $request->role_id);
-        }
-
+        // Custom filter: branch_id via pivot relation
         if ($request->branch_id) {
             $query->whereHas('branches', function ($q) use ($request) {
                 $q->where('branches.id', $request->branch_id);
             });
         }
 
-        if ($request->is_active !== null) {
-            $query->where('is_active', $request->is_active);
-        }
-
-        $sortBy = $request->sort_by ?? 'name';
-        $sortDirection = $request->sort_direction ?? 'asc';
-        $query->orderBy($sortBy, $sortDirection);
-
-        $perPage = $request->per_page ?? 10;
-
-        if ($perPage == -1) {
-            $all = $query->get();
-            return response()->json([
-                'status' => 'success',
-                'data' => $all,
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => $all->count(),
-                    'total' => $all->count(),
-                    'last_page' => 1,
-                ],
-            ]);
-        }
-
-        $users = $query->paginate($perPage);
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $users->items(),
-            'meta' => [
-                'current_page' => $users->currentPage(),
-                'per_page' => $users->perPage(),
-                'total' => $users->total(),
-                'last_page' => $users->lastPage(),
-            ],
+        return $this->paginatedResponse($query, $request, [
+            'searchFields' => ['name', 'email'],
+            'filterFields' => ['role_id'],
+            'defaultSort' => 'name',
         ]);
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
-            'role_id' => 'required|exists:roles,id',
-            'branch_ids' => 'required|array|min:1',
-            'branch_ids.*' => 'exists:branches,id',
-            'is_active' => 'boolean',
-        ]);
+        $request->validate(User::storeRules());
 
         $user = User::create([
             'name' => $request->name,
@@ -90,46 +44,23 @@ class UserController extends Controller
         ]);
 
         $user->branches()->sync($request->branch_ids);
-
         $user->load(['role:id,uuid,code,name', 'branches:id,uuid,code,name']);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'User berhasil dibuat',
-            'data' => $user,
-        ], 201);
+        return $this->storeResponse($user);
     }
 
     public function show(User $user)
     {
-        $user->load([
-            'role:id,uuid,code,name',
-            'branches:id,uuid,code,name',
-            'createdBy:id,name',
-            'updatedBy:id,name',
-        ]);
-
-        $data = $user->toArray();
-        $data['created_by_user'] = $user->createdBy;
-        $data['updated_by_user'] = $user->updatedBy;
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $data,
-        ]);
+        return $this->showResponse(
+            $user,
+            ['role:id,uuid,code,name', 'branches:id,uuid,code,name'],
+            ['createdBy:id,name', 'updatedBy:id,name']
+        );
     }
 
     public function update(Request $request, User $user)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->id,
-            'password' => 'nullable|string|min:6',
-            'role_id' => 'required|exists:roles,id',
-            'branch_ids' => 'required|array|min:1',
-            'branch_ids.*' => 'exists:branches,id',
-            'is_active' => 'boolean',
-        ]);
+        $request->validate(User::updateRules($user->id));
 
         $data = [
             'name' => $request->name,
@@ -145,19 +76,13 @@ class UserController extends Controller
 
         $user->update($data);
         $user->branches()->sync($request->branch_ids);
-
         $user->load(['role:id,uuid,code,name', 'branches:id,uuid,code,name']);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'User berhasil diupdate',
-            'data' => $user,
-        ]);
+        return $this->updateResponse($user);
     }
 
     public function destroy(User $user)
     {
-        // Prevent deleting own account
         if (auth()->id() === $user->id) {
             return response()->json([
                 'status' => 'error',
@@ -168,9 +93,6 @@ class UserController extends Controller
         $user->branches()->detach();
         $user->delete();
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'User berhasil dihapus',
-        ]);
+        return $this->destroyResponse($user);
     }
 }

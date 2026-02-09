@@ -44,6 +44,9 @@ const routePatterns: RouteConfig[] = [
     ...crudRoutes('/master/coa', () => import('@/Pages/Master/Coa/Index.vue'), () => import('@/Pages/Master/Coa/Form.vue')),
     ...crudRoutes('/master/coa-mapping', () => import('@/Pages/Master/CoaMapping/Index.vue'), () => import('@/Pages/Master/CoaMapping/Form.vue')),
     ...crudRoutes('/master/unit', () => import('@/Pages/Master/Unit/Index.vue'), () => import('@/Pages/Master/Unit/Form.vue')),
+    ...crudRoutes('/master/product-category', () => import('@/Pages/Master/ProductCategory/Index.vue'), () => import('@/Pages/Master/ProductCategory/Form.vue')),
+    ...crudRoutes('/master/product-brand', () => import('@/Pages/Master/ProductBrand/Index.vue'), () => import('@/Pages/Master/ProductBrand/Form.vue')),
+    ...crudRoutes('/master/product', () => import('@/Pages/Master/Product/Index.vue'), () => import('@/Pages/Master/Product/Form.vue')),
 ];
 
 const matchRoute = (path: string): { component: any; props: Record<string, any> } => {
@@ -78,12 +81,17 @@ const isDetailRoute = (route: string): boolean => {
 };
 
 const handleNavigate = (route: string) => {
+    
+        currentRoute.value = route;
+        window.history.pushState({}, '', route);
+        /*
     if (isDetailRoute(route)) {
         window.open(route, '_blank');
     } else {
         currentRoute.value = route;
         window.history.pushState({}, '', route);
     }
+    */
 };
 
 const handleAction = (action: string) => {

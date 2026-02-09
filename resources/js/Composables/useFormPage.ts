@@ -124,14 +124,23 @@ export function useFormPage(config: FormPageConfig, props: FormPageProps, emit: 
 
         try {
             const payload = getPayload();
+            let response;
 
             if (props.mode === 'edit' && props.id) {
-                await axios.put(`${apiEndpoint}/${props.id}`, payload);
+                if (payload instanceof FormData) {
+                    // FormData requires POST with _method spoofing for PUT
+                    payload.append('_method', 'PUT');
+                    response = await axios.post(`${apiEndpoint}/${props.id}`, payload);
+                } else {
+                    response = await axios.put(`${apiEndpoint}/${props.id}`, payload);
+                }
             } else {
-                await axios.post(apiEndpoint, payload);
+                response = await axios.post(apiEndpoint, payload);
             }
 
-            emit('navigate', basePath);
+            // Redirect to view mode
+            const uuid = response.data?.data?.uuid;
+            emit('navigate', uuid ? `${basePath}/${uuid}` : basePath);
         } catch (error: any) {
             if (error.response?.data?.errors) {
                 formErrors.value = Object.fromEntries(

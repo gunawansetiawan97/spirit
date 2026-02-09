@@ -55,6 +55,7 @@ const actionLabels: Record<string, string> = {
     approved: 'approve record',
     unapproved: 'unapprove record',
     printed: 'mencetak record',
+    children_updated: 'mengubah detail record',
 };
 
 const actionColors: Record<string, string> = {
@@ -64,6 +65,7 @@ const actionColors: Record<string, string> = {
     approved: 'bg-emerald-500',
     unapproved: 'bg-yellow-500',
     printed: 'bg-purple-500',
+    children_updated: 'bg-indigo-500',
 };
 
 const formatValue = (value: any): string => {
@@ -225,8 +227,8 @@ onMounted(() => {
                             <span class="flex-shrink-0 text-xs text-gray-500">{{ formatDate(log.created_at) }}</span>
                         </div>
 
-                        <!-- Changes detail -->
-                        <div v-if="log.changes && log.action === 'updated'" class="mt-2 space-y-1">
+                        <!-- Changes detail (field updates & children) -->
+                        <div v-if="log.changes && (log.action === 'updated' || log.action === 'children_updated')" class="mt-2 space-y-1">
                             <div
                                 v-for="(newVal, key) in log.changes.new"
                                 :key="String(key)"
