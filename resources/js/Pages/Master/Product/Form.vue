@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { FormPage, AuditInfo } from '@/Components/Form';
+import { FormPage, AuditInfo, BaseFormRow } from '@/Components/Form';
 import { BaseInput, BaseTextarea, BaseSelect, BaseCheckbox, BaseGrid, BaseBrowse, BaseImageUpload } from '@/Components/Form';
 import { useFormPage } from '@/Composables';
 import type { BrowseConfig } from '@/types';
@@ -260,199 +260,193 @@ const onSubmit = () => handleSubmit(() => {
         @edit="handleEdit"
     >
         <template #default="{ readonly }">
-            <div class="space-y-6">
-                <!-- Basic Info -->
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <BaseInput
-                        v-model="form.code"
-                        label="Kode"
-                        :help-text="autoCode ? 'Kode otomatis (nomor final bisa berbeda)' : ''"
-                        :error="formErrors.code"
-                        :disabled="readonly || autoCode || mode === 'edit'"
-                    />
+            <div class="space-y-4">
 
-                    <BaseInput
-                        v-model="form.name"
-                        label="Nama"
-                        placeholder="Masukkan nama produk"
-                        :error="formErrors.name"
-                        :disabled="readonly"
-                        required
-                    />
+                <!-- Basic Info: 2 kolom, label kiri -->
+                <div class="grid grid-cols-2 gap-x-6 gap-y-2">
+                    <BaseFormRow label="Kode" :error="formErrors.code" :help-text="autoCode ? 'Nomor otomatis' : ''">
+                        <BaseInput
+                            v-model="form.code"
+                            :disabled="readonly || autoCode || mode === 'edit'"
+                        />
+                    </BaseFormRow>
 
-                    <BaseBrowse
-                        v-model="form.product_category_id"
-                        :config="categoryBrowseConfig"
-                        label="Kategori"
-                        placeholder="Cari kategori..."
-                        :error="formErrors.product_category_id"
-                        :disabled="readonly"
-                        :row-data="categoryRowData"
-                        @select="handleCategorySelect"
-                        @clear="handleCategoryClear"
-                        @navigate="(route: string) => emit('navigate', route)"
-                    />
+                    <BaseFormRow label="Nama" required :error="formErrors.name">
+                        <BaseInput
+                            v-model="form.name"
+                            placeholder="Nama produk"
+                            :disabled="readonly"
+                        />
+                    </BaseFormRow>
 
-                    <BaseBrowse
-                        v-model="form.product_brand_id"
-                        :config="brandBrowseConfig"
-                        label="Merk"
-                        placeholder="Cari merk..."
-                        :error="formErrors.product_brand_id"
-                        :disabled="readonly"
-                        :row-data="brandRowData"
-                        @select="(row: any) => brandRowData = row"
-                        @navigate="(route: string) => emit('navigate', route)"
-                    />
+                    <BaseFormRow label="Kategori" :error="formErrors.product_category_id">
+                        <BaseBrowse
+                            v-model="form.product_category_id"
+                            :config="categoryBrowseConfig"
+                            placeholder="Cari kategori..."
+                            :disabled="readonly"
+                            :row-data="categoryRowData"
+                            @select="handleCategorySelect"
+                            @clear="handleCategoryClear"
+                            @navigate="(route: string) => emit('navigate', route)"
+                        />
+                    </BaseFormRow>
 
-                    <BaseSelect
-                        v-model="form.type"
-                        :options="typeOptions"
-                        label="Tipe"
-                        :error="formErrors.type"
-                        :disabled="readonly"
-                        required
-                    />
+                    <BaseFormRow label="Merk" :error="formErrors.product_brand_id">
+                        <BaseBrowse
+                            v-model="form.product_brand_id"
+                            :config="brandBrowseConfig"
+                            placeholder="Cari merk..."
+                            :disabled="readonly"
+                            :row-data="brandRowData"
+                            @select="(row: any) => brandRowData = row"
+                            @navigate="(route: string) => emit('navigate', route)"
+                        />
+                    </BaseFormRow>
 
-                    <div></div>
+                    <BaseFormRow label="Tipe" required :error="formErrors.type">
+                        <BaseSelect
+                            v-model="form.type"
+                            :options="typeOptions"
+                            :disabled="readonly"
+                        />
+                    </BaseFormRow>
 
-                    <BaseInput
-                        v-model="form.min_stock"
-                        type="number"
-                        label="Stok Minimum"
-                        placeholder="0"
-                        :error="formErrors.min_stock"
-                        :disabled="readonly"
-                    />
+                    <BaseFormRow label="Status">
+                        <div class="flex h-[34px] items-center">
+                            <BaseCheckbox
+                                v-model="form.is_active"
+                                label="Aktif"
+                                :disabled="readonly"
+                            />
+                        </div>
+                    </BaseFormRow>
 
-                    <BaseInput
-                        v-model="form.max_stock"
-                        type="number"
-                        label="Stok Maksimum"
-                        placeholder="0"
-                        :error="formErrors.max_stock"
-                        :disabled="readonly"
-                    />
+                    <BaseFormRow label="Stok Min" :error="formErrors.min_stock">
+                        <BaseInput
+                            v-model="form.min_stock"
+                            type="number"
+                            placeholder="0"
+                            :disabled="readonly"
+                        />
+                    </BaseFormRow>
 
-                    <div class="md:col-span-2">
+                    <BaseFormRow label="Stok Maks" :error="formErrors.max_stock">
+                        <BaseInput
+                            v-model="form.max_stock"
+                            type="number"
+                            placeholder="0"
+                            :disabled="readonly"
+                        />
+                    </BaseFormRow>
+
+                    <BaseFormRow label="Deskripsi" class="col-span-2" :error="formErrors.description">
                         <BaseTextarea
                             v-model="form.description"
-                            label="Deskripsi"
-                            placeholder="Masukkan deskripsi produk"
-                            :error="formErrors.description"
+                            placeholder="Deskripsi produk"
                             :disabled="readonly"
-                            :rows="3"
+                            :rows="2"
                         />
-                    </div>
+                    </BaseFormRow>
                 </div>
 
-                <!-- Unit Grid -->
-                <div>
-                    <BaseGrid
-                        v-model="unitRows"
-                        :columns="[
-                            { key: 'unit_id', label: 'Unit', width: '300px' },
-                            { key: 'conversion', label: 'Konversi', width: '150px' },
-                            { key: 'is_base_unit', label: 'Unit Dasar', width: '100px' },
-                        ]"
-                        title="Satuan"
-                        :disabled="readonly"
-                        :new-row="() => ({ unit_id: null, conversion: 1, is_base_unit: false })"
-                        :error="formErrors.units"
-                        :unique-keys="['unit_id']"
-                        :required-keys="['unit_id']"
-                    >
-                        <template #cell-unit_id="{ row, disabled }">
-                            <BaseBrowse
-                                :modelValue="row.unit_id"
-                                @update:modelValue="(val: any) => row.unit_id = val"
-                                :config="unitBrowseConfig"
-                                :row-data="unitRowDataMap[row.unit_id]"
-                                :disabled="disabled"
-                                @select="(rowData: any) => unitRowDataMap[rowData.id] = rowData"
-                                @navigate="(route: string) => emit('navigate', route)"
-                            />
-                        </template>
-                        <template #cell-conversion="{ row, disabled }">
-                            <input
-                                v-model.number="row.conversion"
-                                type="number"
-                                step="0.0001"
-                                min="0.0001"
-                                class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                                :disabled="disabled"
-                            />
-                        </template>
-                        <template #cell-is_base_unit="{ row, disabled }">
-                            <div class="flex justify-center">
-                                <input
-                                    v-model="row.is_base_unit"
-                                    type="checkbox"
-                                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                                    :disabled="disabled"
-                                />
-                            </div>
-                        </template>
-                    </BaseGrid>
-                </div>
-
-                <!-- COA Section -->
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-                    <BaseBrowse
-                        v-model="form.coa_inventory_id"
-                        :config="coaBrowseConfig"
-                        label="COA Persediaan"
-                        placeholder="Cari akun..."
-                        :error="formErrors.coa_inventory_id"
-                        :disabled="readonly"
-                        :row-data="coaInventoryRowData"
-                        @select="(row: any) => coaInventoryRowData = row"
-                        @navigate="(route: string) => emit('navigate', route)"
-                    />
-
-                    <BaseBrowse
-                        v-model="form.coa_cogs_id"
-                        :config="coaBrowseConfig"
-                        label="COA HPP"
-                        placeholder="Cari akun..."
-                        :error="formErrors.coa_cogs_id"
-                        :disabled="readonly"
-                        :row-data="coaCogsRowData"
-                        @select="(row: any) => coaCogsRowData = row"
-                        @navigate="(route: string) => emit('navigate', route)"
-                    />
-
-                    <BaseBrowse
-                        v-model="form.coa_sales_id"
-                        :config="coaBrowseConfig"
-                        label="COA Penjualan"
-                        placeholder="Cari akun..."
-                        :error="formErrors.coa_sales_id"
-                        :disabled="readonly"
-                        :row-data="coaSalesRowData"
-                        @select="(row: any) => coaSalesRowData = row"
-                        @navigate="(route: string) => emit('navigate', route)"
-                    />
-                </div>
-
-                <!-- Images -->
-                <BaseImageUpload
-                    v-model:existing-images="existingImages"
-                    v-model:new-files="newFiles"
-                    v-model:deleted-ids="deletedImageIds"
-                    label="Gambar Produk"
+                <!-- Satuan -->
+                <BaseGrid
+                    v-model="unitRows"
+                    :columns="[
+                        { key: 'unit_id', label: 'Unit', width: '300px' },
+                        { key: 'conversion', label: 'Konversi', width: '150px' },
+                        { key: 'is_base_unit', label: 'Unit Dasar', width: '100px' },
+                    ]"
+                    title="Satuan"
                     :disabled="readonly"
-                    :error="formErrors.images"
-                />
+                    :new-row="() => ({ unit_id: null, conversion: 1, is_base_unit: false })"
+                    :error="formErrors.units"
+                    :unique-keys="['unit_id']"
+                    :required-keys="['unit_id']"
+                >
+                    <template #cell-unit_id="{ row, disabled }">
+                        <BaseBrowse
+                            :modelValue="row.unit_id"
+                            @update:modelValue="(val: any) => row.unit_id = val"
+                            :config="unitBrowseConfig"
+                            :row-data="unitRowDataMap[row.unit_id]"
+                            :disabled="disabled"
+                            @select="(rowData: any) => unitRowDataMap[rowData.id] = rowData"
+                            @navigate="(route: string) => emit('navigate', route)"
+                        />
+                    </template>
+                    <template #cell-conversion="{ row, disabled }">
+                        <input
+                            v-model.number="row.conversion"
+                            type="number"
+                            step="0.0001"
+                            min="0.0001"
+                            class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                            :disabled="disabled"
+                        />
+                    </template>
+                    <template #cell-is_base_unit="{ row, disabled }">
+                        <div class="flex justify-center">
+                            <input
+                                v-model="row.is_base_unit"
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                :disabled="disabled"
+                            />
+                        </div>
+                    </template>
+                </BaseGrid>
 
-                <!-- Status -->
-                <div>
-                    <BaseCheckbox
-                        v-model="form.is_active"
-                        label="Status Aktif"
+                <!-- COA: 3 kolom, label kiri -->
+                <div class="grid grid-cols-3 gap-x-6 gap-y-2">
+                    <BaseFormRow label="COA Persediaan" :error="formErrors.coa_inventory_id">
+                        <BaseBrowse
+                            v-model="form.coa_inventory_id"
+                            :config="coaBrowseConfig"
+                            placeholder="Cari akun..."
+                            :disabled="readonly"
+                            :row-data="coaInventoryRowData"
+                            @select="(row: any) => coaInventoryRowData = row"
+                            @navigate="(route: string) => emit('navigate', route)"
+                        />
+                    </BaseFormRow>
+
+                    <BaseFormRow label="COA HPP" :error="formErrors.coa_cogs_id">
+                        <BaseBrowse
+                            v-model="form.coa_cogs_id"
+                            :config="coaBrowseConfig"
+                            placeholder="Cari akun..."
+                            :disabled="readonly"
+                            :row-data="coaCogsRowData"
+                            @select="(row: any) => coaCogsRowData = row"
+                            @navigate="(route: string) => emit('navigate', route)"
+                        />
+                    </BaseFormRow>
+
+                    <BaseFormRow label="COA Penjualan" :error="formErrors.coa_sales_id">
+                        <BaseBrowse
+                            v-model="form.coa_sales_id"
+                            :config="coaBrowseConfig"
+                            placeholder="Cari akun..."
+                            :disabled="readonly"
+                            :row-data="coaSalesRowData"
+                            @select="(row: any) => coaSalesRowData = row"
+                            @navigate="(route: string) => emit('navigate', route)"
+                        />
+                    </BaseFormRow>
+                </div>
+
+                <!-- Gambar -->
+                <BaseFormRow label="Gambar" :error="formErrors.images">
+                    <BaseImageUpload
+                        v-model:existing-images="existingImages"
+                        v-model:new-files="newFiles"
+                        v-model:deleted-ids="deletedImageIds"
                         :disabled="readonly"
                     />
-                </div>
+                </BaseFormRow>
+
             </div>
         </template>
 

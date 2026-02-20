@@ -72,10 +72,10 @@ const handleEdit = () => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50 py-6">
-        <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+    <div class="min-h-screen bg-gray-50 py-4">
+        <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <!-- Header with action buttons -->
-            <div class="mb-6 flex items-center justify-between">
+            <div class="mb-4 flex items-center justify-between">
                 <div class="flex items-center gap-4">
                     <button
                         type="button"
@@ -163,7 +163,7 @@ const handleEdit = () => {
                     @submit.prevent="handleSubmit"
                 >
                     <div
-                        class="rounded-lg bg-white p-6 shadow"
+                        class="rounded-lg bg-white p-4 shadow"
                         :class="{ 'rounded-tl-none': hasTabs }"
                     >
                         <slot :readonly="isReadonly" :mode="mode" />
@@ -176,7 +176,7 @@ const handleEdit = () => {
                         <div
                             v-if="tab.key !== 'data'"
                             v-show="currentTab === tab.key"
-                            class="rounded-lg rounded-tl-none bg-white p-6 shadow"
+                            class="rounded-lg rounded-tl-none bg-white p-4 shadow"
                         >
                             <slot :name="'tab-' + tab.key" :readonly="isReadonly" :mode="mode" />
                         </div>
