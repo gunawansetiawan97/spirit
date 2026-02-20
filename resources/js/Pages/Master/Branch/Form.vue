@@ -1,29 +1,28 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { useUiStore } from '@/stores/ui';
-import { FormPage } from '@/Components/Form';
+import { ref, onMounted } from 'vue';
+import { FormPage, AuditInfo } from '@/Components/Form';
 import { BaseInput, BaseTextarea, BaseCheckbox } from '@/Components/Form';
-import axios from 'axios';
+import { useFormPage } from '@/Composables';
 
-type FormMode = 'create' | 'edit' | 'view';
-
-interface Props {
+const props = withDefaults(defineProps<{
     id?: string | number;
-    mode: FormMode;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-    mode: 'create',
-});
+    mode: 'create' | 'edit' | 'view';
+}>(), { mode: 'create' });
 
 const emit = defineEmits<{
     (e: 'navigate', route: string): void;
 }>();
 
-const uiStore = useUiStore();
-
-const loading = ref(false);
-const saving = ref(false);
+const {
+    loading, saving, formErrors, activeTab, auditData, recordId,
+    formTabs, pageTitle, setupPage, fetchData, handleSubmit, handleBack, handleEdit,
+} = useFormPage({
+    title: 'Cabang',
+    apiEndpoint: '/api/branches',
+    basePath: '/master/branch',
+    auditType: 'branch',
+    auditRelations: ['createdBy', 'updatedBy', 'approvedBy', 'printedBy'],
+}, props, emit);
 
 const form = ref({
     code: '',
@@ -33,19 +32,19 @@ const form = ref({
     is_active: true,
 });
 
-const formErrors = ref<Record<string, string>>({});
+const autoCode = ref(false);
 
-const pageTitle = computed(() => {
-    return 'Cabang';
-});
+const generateAutoCode = () => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const ts = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())}/${pad(now.getHours())}/${pad(now.getMinutes())}/${pad(now.getSeconds())}`;
+    const rand = Math.floor(Math.random() * 100000);
+    return `AUTOCODE/${ts}/${rand}`;
+};
 
-const fetchData = async () => {
-    if (!props.id) return;
-
-    loading.value = true;
-    try {
-        const response = await axios.get(`/api/branches/${props.id}`);
-        const data = response.data.data;
+onMounted(async () => {
+    setupPage();
+    await fetchData((data) => {
         form.value = {
             code: data.code,
             name: data.name,
@@ -53,65 +52,18 @@ const fetchData = async () => {
             phone: data.phone || '',
             is_active: data.is_active,
         };
-    } catch (error: any) {
-        console.error('Failed to fetch branch:', error);
-        alert('Gagal memuat data cabang');
-        emit('navigate', '/master/branch');
-    } finally {
-        loading.value = false;
-    }
-};
+    });
 
-const handleSubmit = async () => {
-    formErrors.value = {};
-    saving.value = true;
-
-    try {
-        if (props.mode === 'edit' && props.id) {
-            await axios.put(`/api/branches/${props.id}`, form.value);
-        } else {
-            await axios.post('/api/branches', form.value);
-        }
-        emit('navigate', '/master/branch');
-    } catch (error: any) {
-        if (error.response?.data?.errors) {
-            formErrors.value = Object.fromEntries(
-                Object.entries(error.response.data.errors).map(([key, value]) => [
-                    key,
-                    Array.isArray(value) ? value[0] : value,
-                ])
-            ) as Record<string, string>;
-        } else {
-            alert(error.response?.data?.message || 'Gagal menyimpan data');
-        }
-    } finally {
-        saving.value = false;
-    }
-};
-
-const handleBack = () => {
-    emit('navigate', '/master/branch');
-};
-
-const handleEdit = () => {
-    if (props.id) {
-        emit('navigate', `/master/branch/${props.id}/edit`);
-    }
-};
-
-onMounted(() => {
-    const titles: Record<FormMode, string> = {
-        create: 'Tambah Cabang',
-        edit: 'Edit Cabang',
-        view: 'Detail Cabang',
-    };
-    uiStore.setPageTitle(titles[props.mode]);
-    uiStore.setPageActions([]);
-
-    if (props.id && (props.mode === 'edit' || props.mode === 'view')) {
-        fetchData();
+    if (props.mode === 'create') {
+        form.value.code = generateAutoCode();
+        autoCode.value = true;
     }
 });
+
+const onSubmit = () => handleSubmit(() => ({
+    ...form.value,
+    code: autoCode.value ? null : form.value.code,
+}));
 </script>
 
 <template>
@@ -120,7 +72,9 @@ onMounted(() => {
         :mode="mode"
         :loading="loading"
         :saving="saving"
-        @submit="handleSubmit"
+        :tabs="formTabs"
+        v-model:active-tab="activeTab"
+        @submit="onSubmit"
         @back="handleBack"
         @edit="handleEdit"
     >
@@ -129,10 +83,10 @@ onMounted(() => {
                 <BaseInput
                     v-model="form.code"
                     label="Kode"
-                    placeholder="Masukkan kode cabang"
+                    :placeholder="autoCode ? '' : 'Masukkan kode cabang'"
+                    :help-text="autoCode ? 'Kode otomatis (nomor final bisa berbeda)' : ''"
                     :error="formErrors.code"
-                    :disabled="readonly"
-                    required
+                    :disabled="readonly || autoCode || mode === 'edit'"
                 />
 
                 <BaseInput
@@ -171,6 +125,14 @@ onMounted(() => {
                     />
                 </div>
             </div>
+        </template>
+
+        <template v-if="recordId" #tab-info>
+            <AuditInfo
+                loggable-type="branch"
+                :loggable-id="recordId"
+                :audit-data="auditData"
+            />
         </template>
     </FormPage>
 </template>

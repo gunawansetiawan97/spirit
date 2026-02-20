@@ -2,9 +2,11 @@
 
 namespace App\Traits;
 
+use App\Models\ActivityLog;
 use App\Models\Branch;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -13,15 +15,46 @@ trait HasAuditFields
 {
     use SoftDeletes;
 
+    /** Cache for Schema::hasColumn() results */
+    protected static array $columnExistsCache = [];
+
+    protected static function tableHasColumn(string $table, string $column): bool
+    {
+        $key = "{$table}.{$column}";
+        if (!isset(static::$columnExistsCache[$key])) {
+            static::$columnExistsCache[$key] = Schema::hasColumn($table, $column);
+        }
+        return static::$columnExistsCache[$key];
+    }
+
     public static function bootHasAuditFields(): void
     {
+        static::created(function ($model) {
+            $model->logActivity('created');
+        });
+
         static::creating(function ($model) {
             if (Auth::check()) {
                 $model->created_by = Auth::id();
-                // Only set branch_id if the table has this column
-                if (Schema::hasColumn($model->getTable(), 'branch_id')) {
+                if (static::tableHasColumn($model->getTable(), 'branch_id')) {
                     $model->branch_id = $model->branch_id ?? Auth::user()->branch_id;
                 }
+            }
+        });
+
+        static::updated(function ($model) {
+            $dirty = $model->getChanges();
+            unset($dirty['updated_at'], $dirty['updated_by']);
+
+            if (!empty($dirty)) {
+                $original = [];
+                foreach (array_keys($dirty) as $key) {
+                    $original[$key] = $model->getOriginal($key);
+                }
+                $model->logActivity('updated', [
+                    'old' => $original,
+                    'new' => $dirty,
+                ]);
             }
         });
 
@@ -35,8 +68,31 @@ trait HasAuditFields
             if (Auth::check() && !$model->isForceDeleting()) {
                 $model->deleted_by = Auth::id();
                 $model->saveQuietly();
+                $model->logActivity('deleted');
             }
         });
+    }
+
+    public function activityLogs(): MorphMany
+    {
+        return $this->morphMany(ActivityLog::class, 'loggable');
+    }
+
+    public function logActivity(string $action, ?array $changes = null): void
+    {
+        if (!Auth::check()) {
+            return;
+        }
+
+        ActivityLog::create([
+            'user_id' => Auth::id(),
+            'loggable_type' => $this->getMorphClass(),
+            'loggable_id' => $this->getKey(),
+            'action' => $action,
+            'changes' => $changes,
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
     }
 
     public function branch(): BelongsTo
@@ -77,14 +133,26 @@ trait HasAuditFields
 
         $this->approved_by = Auth::id();
         $this->approved_at = now();
-        return $this->save();
+        $result = $this->saveQuietly();
+
+        if ($result) {
+            $this->logActivity('approved');
+        }
+
+        return $result;
     }
 
     public function unapprove(): bool
     {
         $this->approved_by = null;
         $this->approved_at = null;
-        return $this->save();
+        $result = $this->saveQuietly();
+
+        if ($result) {
+            $this->logActivity('unapproved');
+        }
+
+        return $result;
     }
 
     public function markAsPrinted(): bool
@@ -95,7 +163,13 @@ trait HasAuditFields
 
         $this->printed_by = Auth::id();
         $this->printed_at = now();
-        return $this->save();
+        $result = $this->saveQuietly();
+
+        if ($result) {
+            $this->logActivity('printed');
+        }
+
+        return $result;
     }
 
     public function isApproved(): bool

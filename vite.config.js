@@ -23,4 +23,14 @@ export default defineConfig({
             '@': resolve(__dirname, 'resources/js'),
         },
     },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    'vendor-vue': ['vue', 'pinia', 'axios'],
+                    'vendor-export': ['jspdf', 'jspdf-autotable', 'xlsx'],
+                },
+            },
+        },
+    },
 });

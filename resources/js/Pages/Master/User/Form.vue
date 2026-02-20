@@ -1,30 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { useUiStore } from '@/stores/ui';
-import { FormPage } from '@/Components/Form';
-import { BaseInput, BaseSelect, BaseCheckbox, BaseBrowseMulti } from '@/Components/Form';
+import { ref, onMounted } from 'vue';
+import { FormPage, AuditInfo } from '@/Components/Form';
+import { BaseInput, BaseSelect, BaseCheckbox, BaseGrid, BaseBrowse } from '@/Components/Form';
+import { useFormPage } from '@/Composables';
 import type { SelectOption, BrowseConfig } from '@/types';
 import axios from 'axios';
 
-type FormMode = 'create' | 'edit' | 'view';
-
-interface Props {
+const props = withDefaults(defineProps<{
     id?: string | number;
-    mode: FormMode;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-    mode: 'create',
-});
+    mode: 'create' | 'edit' | 'view';
+}>(), { mode: 'create' });
 
 const emit = defineEmits<{
     (e: 'navigate', route: string): void;
 }>();
 
-const uiStore = useUiStore();
-
-const loading = ref(false);
-const saving = ref(false);
+const {
+    loading, saving, formErrors, activeTab, auditData, recordId,
+    formTabs, pageTitle, setupPage, fetchData, handleSubmit, handleBack, handleEdit,
+} = useFormPage({
+    title: 'User',
+    apiEndpoint: '/api/users',
+    basePath: '/master/user',
+    auditType: 'user',
+    auditRelations: ['createdBy', 'updatedBy'],
+}, props, emit);
 
 // Options
 const roleOptions = ref<SelectOption[]>([]);
@@ -49,17 +49,11 @@ const form = ref({
     email: '',
     password: '',
     role_id: null as number | null,
-    branch_ids: [] as number[],
     is_active: true,
 });
 
-const branchRowsData = ref<any[]>([]);
-
-const formErrors = ref<Record<string, string>>({});
-
-const pageTitle = computed(() => {
-    return 'User';
-});
+const branchRows = ref<{ branch_id: number | null }[]>([]);
+const branchRowDataMap = ref<Record<number, any>>({});
 
 const fetchOptions = async () => {
     try {
@@ -70,88 +64,34 @@ const fetchOptions = async () => {
     }
 };
 
-const fetchData = async () => {
-    if (!props.id) return;
+onMounted(() => {
+    setupPage();
+    // Run both API calls in parallel
+    Promise.all([
+        fetchOptions(),
+        fetchData((data) => {
+            form.value = {
+                name: data.name,
+                email: data.email,
+                password: '',
+                role_id: data.role?.id || null,
+                is_active: data.is_active,
+            };
+            branchRows.value = data.branches?.map((b: any) => ({ branch_id: b.id })) || [];
+            data.branches?.forEach((b: any) => { branchRowDataMap.value[b.id] = b; });
+        }),
+    ]);
+});
 
-    loading.value = true;
-    try {
-        const response = await axios.get(`/api/users/${props.id}`);
-        const data = response.data.data;
-        form.value = {
-            name: data.name,
-            email: data.email,
-            password: '',
-            role_id: data.role?.id || null,
-            branch_ids: data.branches?.map((b: any) => b.id) || [],
-            is_active: data.is_active,
-        };
-        branchRowsData.value = data.branches || [];
-    } catch (error: any) {
-        console.error('Failed to fetch user:', error);
-        alert('Gagal memuat data user');
-        emit('navigate', '/master/user');
-    } finally {
-        loading.value = false;
+const onSubmit = () => handleSubmit(() => {
+    const payload: any = { ...form.value };
+    if (props.mode === 'edit' && !payload.password) {
+        delete payload.password;
     }
-};
-
-const handleSubmit = async () => {
-    formErrors.value = {};
-    saving.value = true;
-
-    try {
-        const payload = { ...form.value };
-        // Remove password if editing and password is empty
-        if (props.mode === 'edit' && !payload.password) {
-            delete (payload as any).password;
-        }
-
-        if (props.mode === 'edit' && props.id) {
-            await axios.put(`/api/users/${props.id}`, payload);
-        } else {
-            await axios.post('/api/users', payload);
-        }
-        emit('navigate', '/master/user');
-    } catch (error: any) {
-        if (error.response?.data?.errors) {
-            formErrors.value = Object.fromEntries(
-                Object.entries(error.response.data.errors).map(([key, value]) => [
-                    key,
-                    Array.isArray(value) ? value[0] : value,
-                ])
-            ) as Record<string, string>;
-        } else {
-            alert(error.response?.data?.message || 'Gagal menyimpan data');
-        }
-    } finally {
-        saving.value = false;
-    }
-};
-
-const handleBack = () => {
-    emit('navigate', '/master/user');
-};
-
-const handleEdit = () => {
-    if (props.id) {
-        emit('navigate', `/master/user/${props.id}/edit`);
-    }
-};
-
-onMounted(async () => {
-    const titles: Record<FormMode, string> = {
-        create: 'Tambah User',
-        edit: 'Edit User',
-        view: 'Detail User',
-    };
-    uiStore.setPageTitle(titles[props.mode]);
-    uiStore.setPageActions([]);
-
-    await fetchOptions();
-
-    if (props.id && (props.mode === 'edit' || props.mode === 'view')) {
-        fetchData();
-    }
+    payload.branch_ids = branchRows.value
+        .map(r => r.branch_id)
+        .filter(Boolean);
+    return payload;
 });
 </script>
 
@@ -161,7 +101,9 @@ onMounted(async () => {
         :mode="mode"
         :loading="loading"
         :saving="saving"
-        @submit="handleSubmit"
+        :tabs="formTabs"
+        v-model:active-tab="activeTab"
+        @submit="onSubmit"
         @back="handleBack"
         @edit="handleEdit"
     >
@@ -208,17 +150,28 @@ onMounted(async () => {
                 />
 
                 <div class="md:col-span-2">
-                    <BaseBrowseMulti
-                        v-model="form.branch_ids"
-                        :config="branchBrowseConfig"
-                        :rows-data="branchRowsData"
-                        label="Cabang"
-                        placeholder="Pilih cabang..."
-                        :error="formErrors.branch_ids"
+                    <BaseGrid
+                        v-model="branchRows"
+                        :columns="[{ key: 'branch_id', label: 'Cabang' }]"
+                        title="Cabang"
                         :disabled="readonly"
-                        required
-                        @navigate="(route: string) => emit('navigate', route)"
-                    />
+                        :new-row="() => ({ branch_id: null })"
+                        :error="formErrors.branch_ids"
+                        :unique-keys="['branch_id']"
+                        :required-keys="['branch_id']"
+                    >
+                        <template #cell-branch_id="{ row, index, disabled }">
+                            <BaseBrowse
+                                :modelValue="row.branch_id"
+                                @update:modelValue="(val: any) => row.branch_id = val"
+                                :config="branchBrowseConfig"
+                                :row-data="branchRowDataMap[row.branch_id]"
+                                :disabled="disabled"
+                                @select="(rowData: any) => branchRowDataMap[rowData.id] = rowData"
+                                @navigate="(route: string) => emit('navigate', route)"
+                            />
+                        </template>
+                    </BaseGrid>
                 </div>
 
                 <div class="md:col-span-2">
@@ -229,6 +182,14 @@ onMounted(async () => {
                     />
                 </div>
             </div>
+        </template>
+
+        <template v-if="recordId" #tab-info>
+            <AuditInfo
+                loggable-type="user"
+                :loggable-id="recordId"
+                :audit-data="auditData"
+            />
         </template>
     </FormPage>
 </template>

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\HasAuditFields;
 use App\Traits\HasUuid;
+use App\Traits\HasValidation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,7 +12,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Role extends Model
 {
-    use HasFactory, HasAuditFields, HasUuid;
+    use HasFactory, HasAuditFields, HasUuid, HasValidation;
+
+    public static string $label = 'Role';
 
     protected $fillable = [
         'code',
@@ -20,6 +23,16 @@ class Role extends Model
         'is_active',
         'branch_id',
     ];
+
+    public static function validationRules(): array
+    {
+        return [
+            'code' => 'required|string|max:20|unique:roles,code',
+            'name' => 'required|string|max:100',
+            'description' => 'nullable|string',
+            'is_active' => 'boolean',
+        ];
+    }
 
     protected $casts = [
         'is_active' => 'boolean',

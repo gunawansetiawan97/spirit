@@ -30,6 +30,31 @@ class PermissionSeeder extends Seeder
                     ['code' => 'master.role', 'name' => 'Role', 'route' => '/master/role', 'sort_order' => 2],
                     ['code' => 'master.user', 'name' => 'User', 'route' => '/master/user', 'sort_order' => 3],
                     ['code' => 'master.permission', 'name' => 'Hak Akses', 'route' => '/master/permission', 'sort_order' => 4],
+                    ['code' => 'master.number_sequence', 'name' => 'Penomoran', 'route' => '/master/number-sequence', 'sort_order' => 5],
+                    [
+                        'code' => 'master.accounting',
+                        'name' => 'Akuntansi',
+                        'route' => null,
+                        'sort_order' => 6,
+                        'children' => [
+                            ['code' => 'master.accounting.account_type', 'name' => 'Tipe Akun', 'route' => '/master/account-type', 'sort_order' => 1],
+                            ['code' => 'master.accounting.account_group', 'name' => 'Group Akun', 'route' => '/master/account-group', 'sort_order' => 2],
+                            ['code' => 'master.accounting.coa', 'name' => 'Chart of Account', 'route' => '/master/coa', 'sort_order' => 3],
+                            ['code' => 'master.accounting.coa_mapping', 'name' => 'COA Mapping', 'route' => '/master/coa-mapping', 'sort_order' => 4],
+                        ]
+                    ],
+                    [
+                        'code' => 'master.product',
+                        'name' => 'Produk',
+                        'route' => null,
+                        'sort_order' => 7,
+                        'children' => [
+                            ['code' => 'master.product.unit', 'name' => 'Unit', 'route' => '/master/unit', 'sort_order' => 1],
+                            ['code' => 'master.product.product_category', 'name' => 'Kategori Produk', 'route' => '/master/product-category', 'sort_order' => 2],
+                            ['code' => 'master.product.product_brand', 'name' => 'Merk Produk', 'route' => '/master/product-brand', 'sort_order' => 3],
+                            ['code' => 'master.product.product', 'name' => 'Produk', 'route' => '/master/product', 'sort_order' => 4], 
+                        ]
+                    ],
                 ],
             ],
             [
@@ -119,7 +144,10 @@ class PermissionSeeder extends Seeder
         $data['parent_id'] = $parentId;
         $data['type'] = $data['type'] ?? 'submenu';
 
-        $permission = Permission::create($data);
+        $permission = Permission::updateOrCreate(
+            ['code' => $data['code']],
+            $data
+        );
 
         foreach ($children as $child) {
             $this->createPermission($child, $permission->id);

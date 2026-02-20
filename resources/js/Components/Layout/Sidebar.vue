@@ -24,7 +24,7 @@ const isActive = (route: string | null) => {
     return window.location.pathname === route;
 };
 
-const hasActiveChild = (children: any[] | undefined) => {
+const hasActiveChild = (children: any[] | undefined): boolean => {
     if (!children) return false;
     return children.some(child => isActive(child.route) || hasActiveChild(child.children));
 };
@@ -95,21 +95,61 @@ const getIcon = (iconName: string | null) => {
                                 </svg>
                             </template>
                         </button>
-                        <!-- Submenu -->
+                        <!-- Level 2 submenu -->
                         <ul
                             v-if="!uiStore.sidebarCollapsed"
                             v-show="isExpanded(menu.code)"
                             class="mt-1 space-y-1 pl-8"
                         >
                             <li v-for="child in menu.children" :key="child.code">
-                                <a
-                                    href="#"
-                                    class="block rounded-lg px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
-                                    :class="{ 'bg-primary-600 text-white': isActive(child.route) }"
-                                    @click.prevent="handleNavigate(child.route)"
-                                >
-                                    {{ child.name }}
-                                </a>
+                                <!-- Child with grandchildren (level 3 group) -->
+                                <template v-if="child.children && child.children.length > 0">
+                                    <button
+                                        type="button"
+                                        class="flex w-full items-center rounded-lg px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+                                        :class="{ 'text-white': hasActiveChild(child.children) }"
+                                        @click="toggleMenu(child.code)"
+                                    >
+                                        <span class="flex-1 text-left">{{ child.name }}</span>
+                                        <svg
+                                            class="h-3.5 w-3.5 transition-transform"
+                                            :class="{ 'rotate-180': isExpanded(child.code) }"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+                                    <!-- Level 3 submenu -->
+                                    <ul
+                                        v-show="isExpanded(child.code)"
+                                        class="mt-1 space-y-1 pl-4"
+                                    >
+                                        <li v-for="grandchild in child.children" :key="grandchild.code">
+                                            <a
+                                                href="#"
+                                                class="block rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-800 hover:text-white"
+                                                :class="{ 'bg-primary-600 text-white': isActive(grandchild.route) }"
+                                                @click.prevent="handleNavigate(grandchild.route)"
+                                            >
+                                                {{ grandchild.name }}
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </template>
+
+                                <!-- Child without grandchildren (leaf item) -->
+                                <template v-else>
+                                    <a
+                                        href="#"
+                                        class="block rounded-lg px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+                                        :class="{ 'bg-primary-600 text-white': isActive(child.route) }"
+                                        @click.prevent="handleNavigate(child.route)"
+                                    >
+                                        {{ child.name }}
+                                    </a>
+                                </template>
                             </li>
                         </ul>
                     </template>

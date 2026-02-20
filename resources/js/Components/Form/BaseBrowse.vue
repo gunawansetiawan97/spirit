@@ -28,6 +28,7 @@ const emit = defineEmits<{
     (e: 'update:modelValue', value: string | number | null): void;
     (e: 'change', value: string | number | null): void;
     (e: 'select', row: any): void;
+    (e: 'clear'): void;
     (e: 'navigate', route: string): void;
 }>();
 
@@ -180,6 +181,7 @@ const clearSelection = () => {
     inputSearch.value = '';
     emit('update:modelValue', null);
     emit('change', null);
+    emit('clear');
 };
 
 // --- Action buttons ---

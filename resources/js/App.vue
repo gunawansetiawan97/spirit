@@ -1,26 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, markRaw, h } from 'vue';
+import { ref, onMounted, computed, markRaw, defineAsyncComponent } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useUiStore } from '@/stores/ui';
 import { AppLayout } from '@/Components/Layout';
 import Login from '@/Pages/Auth/Login.vue';
 import Dashboard from '@/Pages/Dashboard.vue';
 
-// Master pages
-import RoleIndex from '@/Pages/Master/Role/Index.vue';
-import RoleForm from '@/Pages/Master/Role/Form.vue';
-import RolePermission from '@/Pages/Master/Role/Permission.vue';
-import UserIndex from '@/Pages/Master/User/Index.vue';
-import UserForm from '@/Pages/Master/User/Form.vue';
-import BranchIndex from '@/Pages/Master/Branch/Index.vue';
-import BranchForm from '@/Pages/Master/Branch/Form.vue';
-
 const authStore = useAuthStore();
-const uiStore = useUiStore();
 
 const isInitialized = ref(false);
 const currentRoute = ref('/dashboard');
-const routeParams = ref<Record<string, string>>({});
 
 // Route patterns with parameter matching
 interface RouteConfig {
@@ -29,24 +17,39 @@ interface RouteConfig {
     getProps?: (params: Record<string, string>) => Record<string, any>;
 }
 
-// UUID pattern: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-const UUID_PATTERN = '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}';
+const UUID = '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}';
+
+// Generate standard CRUD routes (index, create, view, edit) for a module
+function crudRoutes(path: string, index: () => Promise<any>, form: () => Promise<any>): RouteConfig[] {
+    const I = defineAsyncComponent(index);
+    const F = defineAsyncComponent(form);
+    return [
+        { pattern: new RegExp(`^${path}$`), component: I },
+        { pattern: new RegExp(`^${path}/create$`), component: F, getProps: () => ({ mode: 'create' }) },
+        { pattern: new RegExp(`^${path}/(${UUID})$`), component: F, getProps: (p) => ({ id: p.id, mode: 'view' }) },
+        { pattern: new RegExp(`^${path}/(${UUID})/edit$`), component: F, getProps: (p) => ({ id: p.id, mode: 'edit' }) },
+    ];
+}
+
+const RolePermission = defineAsyncComponent(() => import('@/Pages/Master/Role/Permission.vue'));
 
 const routePatterns: RouteConfig[] = [
     { pattern: /^\/dashboard$/, component: Dashboard },
-    { pattern: /^\/master\/role$/, component: RoleIndex },
-    { pattern: /^\/master\/role\/create$/, component: RoleForm, getProps: () => ({ mode: 'create' }) },
-    { pattern: new RegExp(`^/master/role/(${UUID_PATTERN})$`), component: RoleForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
-    { pattern: new RegExp(`^/master/role/(${UUID_PATTERN})/edit$`), component: RoleForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
-    { pattern: new RegExp(`^/master/role/(${UUID_PATTERN})/permissions$`), component: RolePermission, getProps: (params) => ({ roleId: params.id }) },
-    { pattern: /^\/master\/user$/, component: UserIndex },
-    { pattern: /^\/master\/user\/create$/, component: UserForm, getProps: () => ({ mode: 'create' }) },
-    { pattern: new RegExp(`^/master/user/(${UUID_PATTERN})$`), component: UserForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
-    { pattern: new RegExp(`^/master/user/(${UUID_PATTERN})/edit$`), component: UserForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
-    { pattern: /^\/master\/branch$/, component: BranchIndex },
-    { pattern: /^\/master\/branch\/create$/, component: BranchForm, getProps: () => ({ mode: 'create' }) },
-    { pattern: new RegExp(`^/master/branch/(${UUID_PATTERN})$`), component: BranchForm, getProps: (params) => ({ id: params.id, mode: 'view' }) },
-    { pattern: new RegExp(`^/master/branch/(${UUID_PATTERN})/edit$`), component: BranchForm, getProps: (params) => ({ id: params.id, mode: 'edit' }) },
+    ...crudRoutes('/master/role', () => import('@/Pages/Master/Role/Index.vue'), () => import('@/Pages/Master/Role/Form.vue')),
+    { pattern: new RegExp(`^/master/role/(${UUID})/permissions$`), component: RolePermission, getProps: (p) => ({ roleId: p.id }) },
+    ...crudRoutes('/master/user', () => import('@/Pages/Master/User/Index.vue'), () => import('@/Pages/Master/User/Form.vue')),
+    ...crudRoutes('/master/branch', () => import('@/Pages/Master/Branch/Index.vue'), () => import('@/Pages/Master/Branch/Form.vue')),
+    ...crudRoutes('/master/account-type', () => import('@/Pages/Master/AccountType/Index.vue'), () => import('@/Pages/Master/AccountType/Form.vue')),
+    ...crudRoutes('/master/account-group', () => import('@/Pages/Master/AccountGroup/Index.vue'), () => import('@/Pages/Master/AccountGroup/Form.vue')),
+    ...crudRoutes('/master/coa', () => import('@/Pages/Master/Coa/Index.vue'), () => import('@/Pages/Master/Coa/Form.vue')),
+    ...crudRoutes('/master/coa-mapping', () => import('@/Pages/Master/CoaMapping/Index.vue'), () => import('@/Pages/Master/CoaMapping/Form.vue')),
+    ...crudRoutes('/master/unit', () => import('@/Pages/Master/Unit/Index.vue'), () => import('@/Pages/Master/Unit/Form.vue')),
+    ...crudRoutes('/master/product-category', () => import('@/Pages/Master/ProductCategory/Index.vue'), () => import('@/Pages/Master/ProductCategory/Form.vue')),
+    ...crudRoutes('/master/product-brand', () => import('@/Pages/Master/ProductBrand/Index.vue'), () => import('@/Pages/Master/ProductBrand/Form.vue')),
+    ...crudRoutes('/master/product', () => import('@/Pages/Master/Product/Index.vue'), () => import('@/Pages/Master/Product/Form.vue')),
+    ...crudRoutes('/master/warehouse', () => import('@/Pages/Master/Warehouse/Index.vue'), () => import('@/Pages/Master/Warehouse/Form.vue')),
+    ...crudRoutes('/master/adjustment-type', () => import('@/Pages/Master/AdjustmentType/Index.vue'), () => import('@/Pages/Master/AdjustmentType/Form.vue')),
+    ...crudRoutes('/transaction/stock-adjustment', () => import('@/Pages/Transaction/StockAdjustment/Index.vue'), () => import('@/Pages/Transaction/StockAdjustment/Form.vue')),
 ];
 
 const matchRoute = (path: string): { component: any; props: Record<string, any> } => {
@@ -81,12 +84,17 @@ const isDetailRoute = (route: string): boolean => {
 };
 
 const handleNavigate = (route: string) => {
+    
+        currentRoute.value = route;
+        window.history.pushState({}, '', route);
+        /*
     if (isDetailRoute(route)) {
         window.open(route, '_blank');
     } else {
         currentRoute.value = route;
         window.history.pushState({}, '', route);
     }
+    */
 };
 
 const handleAction = (action: string) => {
