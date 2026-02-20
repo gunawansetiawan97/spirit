@@ -47,6 +47,9 @@ const routePatterns: RouteConfig[] = [
     ...crudRoutes('/master/product-category', () => import('@/Pages/Master/ProductCategory/Index.vue'), () => import('@/Pages/Master/ProductCategory/Form.vue')),
     ...crudRoutes('/master/product-brand', () => import('@/Pages/Master/ProductBrand/Index.vue'), () => import('@/Pages/Master/ProductBrand/Form.vue')),
     ...crudRoutes('/master/product', () => import('@/Pages/Master/Product/Index.vue'), () => import('@/Pages/Master/Product/Form.vue')),
+    ...crudRoutes('/master/warehouse', () => import('@/Pages/Master/Warehouse/Index.vue'), () => import('@/Pages/Master/Warehouse/Form.vue')),
+    ...crudRoutes('/master/adjustment-type', () => import('@/Pages/Master/AdjustmentType/Index.vue'), () => import('@/Pages/Master/AdjustmentType/Form.vue')),
+    ...crudRoutes('/transaction/stock-adjustment', () => import('@/Pages/Transaction/StockAdjustment/Index.vue'), () => import('@/Pages/Transaction/StockAdjustment/Form.vue')),
 ];
 
 const matchRoute = (path: string): { component: any; props: Record<string, any> } => {

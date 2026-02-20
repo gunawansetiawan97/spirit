@@ -16,6 +16,10 @@ use App\Http\Controllers\Api\NumberSequenceController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductBrandController;
+use App\Http\Controllers\Api\WarehouseController;
+use App\Http\Controllers\Api\AdjustmentTypeController;
+use App\Http\Controllers\Api\StockAdjustmentController;
+use App\Http\Controllers\Api\StockLedgerController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -87,6 +91,20 @@ Route::middleware('auth:sanctum')->group(function () {
     // Products
     Route::get('/products/list', [ProductController::class, 'all']);
     Route::apiResource('/products', ProductController::class);
+
+    // Warehouses
+    Route::get('/warehouses/list', [WarehouseController::class, 'all']);
+    Route::apiResource('/warehouses', WarehouseController::class);
+
+    // Adjustment Types
+    Route::get('/adjustment-types/list', [AdjustmentTypeController::class, 'all']);
+    Route::apiResource('/adjustment-types', AdjustmentTypeController::class);
+
+    // Stock Adjustments
+    Route::apiResource('/stock-adjustments', StockAdjustmentController::class);
+
+    // Stock Ledger
+    Route::get('/stock-ledgers/batches', [StockLedgerController::class, 'batches']);
 
     // Activity Logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);
