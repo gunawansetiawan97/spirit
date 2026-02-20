@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, markRaw, defineAsyncComponent } from 'vue';
 import { useAuthStore } from '@/stores/auth';
+import { useUiStore } from '@/stores/ui';
 import { AppLayout } from '@/Components/Layout';
 import Login from '@/Pages/Auth/Login.vue';
 import Dashboard from '@/Pages/Dashboard.vue';
 
 const authStore = useAuthStore();
+const uiStore = useUiStore();
 
 const isInitialized = ref(false);
 const currentRoute = ref('/dashboard');
@@ -50,6 +52,8 @@ const routePatterns: RouteConfig[] = [
     ...crudRoutes('/master/warehouse', () => import('@/Pages/Master/Warehouse/Index.vue'), () => import('@/Pages/Master/Warehouse/Form.vue')),
     ...crudRoutes('/master/adjustment-type', () => import('@/Pages/Master/AdjustmentType/Index.vue'), () => import('@/Pages/Master/AdjustmentType/Form.vue')),
     ...crudRoutes('/transaction/stock-adjustment', () => import('@/Pages/Transaction/StockAdjustment/Index.vue'), () => import('@/Pages/Transaction/StockAdjustment/Form.vue')),
+    ...crudRoutes('/transaction/stock-transfer', () => import('@/Pages/Transaction/StockTransfer/Index.vue'), () => import('@/Pages/Transaction/StockTransfer/Form.vue')),
+    ...crudRoutes('/purchasing/supplier', () => import('@/Pages/Purchasing/Supplier/Index.vue'), () => import('@/Pages/Purchasing/Supplier/Form.vue')),
 ];
 
 const matchRoute = (path: string): { component: any; props: Record<string, any> } => {
@@ -84,8 +88,8 @@ const isDetailRoute = (route: string): boolean => {
 };
 
 const handleNavigate = (route: string) => {
-    
         currentRoute.value = route;
+        uiStore.setCurrentRoute(route);
         window.history.pushState({}, '', route);
         /*
     if (isDetailRoute(route)) {
@@ -118,7 +122,9 @@ onMounted(async () => {
 
     // Handle browser back/forward
     window.addEventListener('popstate', () => {
-        currentRoute.value = window.location.pathname || '/dashboard';
+        const path = window.location.pathname || '/dashboard';
+        currentRoute.value = path;
+        uiStore.setCurrentRoute(path);
     });
 
     // Set initial route

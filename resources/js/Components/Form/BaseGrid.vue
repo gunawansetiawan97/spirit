@@ -125,17 +125,17 @@ const isCellEmpty = (index: number, key: string) => {
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-gray-200 bg-gray-50">
-                        <th class="w-12 rounded-tl-md px-3 py-2 text-center font-medium text-gray-600">No.</th>
+                        <th class="w-10 rounded-tl-md px-2 py-1.5 text-center font-medium text-gray-600">No.</th>
                         <th
                             v-for="(col, ci) in columns"
                             :key="col.key"
-                            class="px-3 py-2 text-left font-medium text-gray-600"
+                            class="px-2 py-1.5 text-left font-medium text-gray-600"
                             :class="{ 'rounded-tr-md': (deletable && !disabled) ? false : ci === columns.length - 1 }"
                             :style="col.width ? { width: col.width } : {}"
                         >
                             {{ col.label }}
                         </th>
-                        <th v-if="deletable && !disabled" class="w-12 rounded-tr-md px-3 py-2"></th>
+                        <th v-if="deletable && !disabled" class="w-10 rounded-tr-md px-2 py-1.5"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -145,11 +145,11 @@ const isCellEmpty = (index: number, key: string) => {
                         class="border-b border-gray-100 last:border-b-0"
                         :class="{ 'bg-danger-50': isRowError(index) }"
                     >
-                        <td class="px-3 py-1.5 text-center text-gray-500">{{ index + 1 }}</td>
+                        <td class="px-2 py-1 text-center text-gray-500">{{ index + 1 }}</td>
                         <td
                             v-for="col in columns"
                             :key="col.key"
-                            class="relative py-1.5 pl-3 pr-3"
+                            class="relative py-1 pl-1.5 pr-1.5"
                         >
                             <slot
                                 :name="`cell-${col.key}`"
@@ -160,7 +160,7 @@ const isCellEmpty = (index: number, key: string) => {
                                 :empty="isCellEmpty(index, col.key)"
                             />
                         </td>
-                        <td v-if="deletable && !disabled" class="px-1.5 py-1.5 text-center">
+                        <td v-if="deletable && !disabled" class="px-1 py-1 text-center">
                             <button
                                 type="button"
                                 class="rounded p-1 text-gray-400 transition-colors hover:bg-danger-50 hover:text-danger-500"

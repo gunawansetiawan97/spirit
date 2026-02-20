@@ -13,7 +13,7 @@ const actionLoading = ref<Record<string, boolean>>({});
 const handleApprove = async (row: any) => {
     actionLoading.value[`approve-${row.uuid}`] = true;
     try {
-        await axios.post(`/api/stock-adjustments/${row.uuid}/approve`);
+        await axios.post(`/api/stock-transfers/${row.uuid}/approve`);
         fetchData();
     } catch (err: any) {
         alert(err.response?.data?.message || 'Gagal melakukan approve.');
@@ -26,7 +26,7 @@ const handleDisapprove = async (row: any) => {
     if (!confirm('Yakin ingin disapprove dokumen ini?')) return;
     actionLoading.value[`disapprove-${row.uuid}`] = true;
     try {
-        await axios.post(`/api/stock-adjustments/${row.uuid}/disapprove`);
+        await axios.post(`/api/stock-transfers/${row.uuid}/disapprove`);
         fetchData();
     } catch (err: any) {
         alert(err.response?.data?.message || 'Gagal melakukan disapprove.');
@@ -44,32 +44,41 @@ const {
     navigateToEdit, handleDelete, handleFilter, handleFilterReset,
     handleFilterUpdate, handleExportExcel, handleExportPdf,
 } = useIndexPage({
-    title: 'Penyesuaian Stok',
-    entityName: 'stock-adjustment',
-    entityLabel: 'Penyesuaian Stok',
-    apiEndpoint: '/api/stock-adjustments',
-    basePath: '/transaction/stock-adjustment',
+    title: 'Transfer Stok',
+    entityName: 'stock-transfer',
+    entityLabel: 'Transfer Stok',
+    apiEndpoint: '/api/stock-transfers',
+    basePath: '/transaction/stock-transfer',
+    permissionPrefix: 'transaction.stock_transfer',
     columns: [
-        { key: 'code', label: 'No. Dokumen', width: '160px', sortable: true },
-        { key: 'date', label: 'Tanggal', width: '120px', type: 'date', sortable: true },
+        { key: 'code',                  label: 'No. Dokumen',  sortable: true,  width: '160px' },
+        { key: 'date',                  label: 'Tanggal',      sortable: true,  width: '120px', type: 'date' },
         {
-            key: 'warehouse',
-            label: 'Gudang',
+            key: 'from_warehouse',
+            label: 'Dari Gudang',
             formatter: (v: any) => v ? `${v.code} - ${v.name}` : '-',
         },
-        { key: 'description', label: 'Keterangan' },
-        { key: 'status', label: 'Status', width: '100px', align: 'center', type: 'status' },
+        {
+            key: 'to_warehouse',
+            label: 'Ke Gudang',
+            formatter: (v: any) => v ? `${v.code} - ${v.name}` : '-',
+        },
+        { key: 'description',           label: 'Keterangan' },
+        { key: 'status',                label: 'Status',       width: '100px', align: 'center', type: 'status' },
     ],
     filters: [
-        { key: 'status', label: 'Status', type: 'select', options: [
-            { value: '', label: 'Semua' },
-            { value: 'draft', label: 'Draft' },
-            { value: 'posted', label: 'Posted' },
-        ]},
+        {
+            key: 'status', label: 'Status', type: 'select',
+            options: [
+                { value: '',       label: 'Semua'    },
+                { value: 'draft',  label: 'Draft'    },
+                { value: 'posted', label: 'Approved' },
+            ],
+        },
     ],
-    permissionPrefix: 'transaction.stock_adjustment',
+    searchPlaceholder: 'Cari nomor / keterangan...',
     actions: [
-        { type: 'view',   permission: 'transaction.stock_adjustment', action: 'view' },
+        { type: 'view',   permission: 'transaction.stock_transfer', action: 'view' },
         {
             type: 'custom',
             label: 'Approve',
@@ -86,8 +95,8 @@ const {
             show: (row: any) => row.status === 'posted',
             onClick: handleDisapprove,
         },
-        { type: 'edit',   permission: 'transaction.stock_adjustment', action: 'edit',   show: (row: any) => row.status === 'draft' },
-        { type: 'delete', permission: 'transaction.stock_adjustment', action: 'delete', show: (row: any) => row.status === 'draft' },
+        { type: 'edit',   permission: 'transaction.stock_transfer', action: 'edit',   show: (row: any) => row.status === 'draft' },
+        { type: 'delete', permission: 'transaction.stock_transfer', action: 'delete', show: (row: any) => row.status === 'draft' },
     ],
 }, emit);
 </script>

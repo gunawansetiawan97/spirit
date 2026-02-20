@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 trait HasIndexQuery
 {
@@ -55,6 +56,15 @@ trait HasIndexQuery
         foreach ($filterFields as $field) {
             if ($request->has($field) && $request->$field !== null) {
                 $query->where($field, $request->$field);
+            }
+        }
+
+        // Branch filter via X-Branch-ID header
+        $branchId = $request->header('X-Branch-ID');
+        if ($branchId) {
+            $table = $query->getModel()->getTable();
+            if (Schema::hasColumn($table, 'branch_id')) {
+                $query->where("{$table}.branch_id", $branchId);
             }
         }
 
@@ -131,6 +141,7 @@ trait HasIndexQuery
         $auditRelations = $auditRelations ?? [
             'createdBy:id,name',
             'updatedBy:id,name',
+            'deletedBy:id,name',
             'approvedBy:id,name',
             'printedBy:id,name',
         ];
@@ -142,6 +153,7 @@ trait HasIndexQuery
         $auditMap = [
             'createdBy' => 'created_by_user',
             'updatedBy' => 'updated_by_user',
+            'deletedBy' => 'deleted_by_user',
             'approvedBy' => 'approved_by_user',
             'printedBy' => 'printed_by_user',
         ];

@@ -27,6 +27,14 @@ trait HasAuditFields
         return static::$columnExistsCache[$key];
     }
 
+    protected function initializeHasAuditFields(): void
+    {
+        $this->mergeCasts([
+            'approved_at' => 'datetime',
+            'printed_at'  => 'datetime',
+        ]);
+    }
+
     public static function bootHasAuditFields(): void
     {
         static::created(function ($model) {
@@ -37,7 +45,11 @@ trait HasAuditFields
             if (Auth::check()) {
                 $model->created_by = Auth::id();
                 if (static::tableHasColumn($model->getTable(), 'branch_id')) {
-                    $model->branch_id = $model->branch_id ?? Auth::user()->branch_id;
+                    // Priority: explicitly set on model → X-Branch-ID header → user's default branch
+                    $xBranchId = request()?->header('X-Branch-ID');
+                    $model->branch_id = $model->branch_id
+                        ?? ($xBranchId ? (int) $xBranchId : null)
+                        ?? Auth::user()->branch_id;
                 }
             }
         });
@@ -61,6 +73,10 @@ trait HasAuditFields
         static::updating(function ($model) {
             if (Auth::check()) {
                 $model->updated_by = Auth::id();
+            }
+            // branch_id is immutable after creation
+            if (static::tableHasColumn($model->getTable(), 'branch_id') && $model->isDirty('branch_id')) {
+                $model->branch_id = $model->getOriginal('branch_id');
             }
         });
 

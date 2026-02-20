@@ -17,10 +17,10 @@ const {
     loading, saving, formErrors, activeTab, auditData, recordId,
     formTabs, pageTitle, setupPage, fetchData, handleSubmit, handleBack, handleEdit,
 } = useFormPage({
-    title: 'Penyesuaian Stok',
-    apiEndpoint: '/api/stock-adjustments',
-    basePath: '/transaction/stock-adjustment',
-    auditType: 'stock_adjustment',
+    title: 'Transfer Stok',
+    apiEndpoint: '/api/stock-transfers',
+    basePath: '/transaction/stock-transfer',
+    auditType: 'stock_transfer',
     auditRelations: ['createdBy', 'updatedBy', 'approvedBy', 'deletedBy'],
 }, props, emit);
 
@@ -29,13 +29,13 @@ const form = ref({
     code: '',
     status: 'draft' as 'draft' | 'posted',
     date: new Date().toISOString().substring(0, 10),
-    warehouse_id: null as number | null,
-    adjustment_type_id: null as number | null,
+    from_warehouse_id: null as number | null,
+    to_warehouse_id: null as number | null,
     description: '',
 });
 
-const warehouseRowData = ref<any>(null);
-const adjustmentTypeRowData = ref<any>(null);
+const fromWarehouseRowData = ref<any>(null);
+const toWarehouseRowData   = ref<any>(null);
 
 const autoCode = ref(false);
 
@@ -46,17 +46,13 @@ const generateAutoCode = () => {
     return `AUTOCODE/${ts}/${Math.floor(Math.random() * 100000)}`;
 };
 
-// UUID for approve URL (route model binding uses uuid, not integer id)
 const recordUuid = ref('');
-
-// Approve state
-const approving = ref(false);
+const approving  = ref(false);
 const approveError = ref('');
 
 // --- Detail rows ---
 interface DetailRow {
     product_id: number | null;
-    direction: 'in' | 'out';
     batch_number: string;
     unit_id: number | null;
     qty: number;
@@ -68,18 +64,10 @@ interface DetailRow {
     _batchOptions: { value: string; label: string }[];
 }
 
-// Separated IN / OUT rows — merged on submit, split on load
-const inRows  = ref<DetailRow[]>([]);
-const outRows = ref<DetailRow[]>([]);
+const rows = ref<DetailRow[]>([]);
 
-const newInRow = (): DetailRow => ({
-    product_id: null, direction: 'in',  batch_number: '', unit_id: null,
-    qty: 1, unit_cost: 0, description: '',
-    _productData: null, _units: [], _batchOptions: [],
-});
-
-const newOutRow = (): DetailRow => ({
-    product_id: null, direction: 'out', batch_number: '', unit_id: null,
+const newRow = (): DetailRow => ({
+    product_id: null, batch_number: '', unit_id: null,
     qty: 1, unit_cost: 0, description: '',
     _productData: null, _units: [], _batchOptions: [],
 });
@@ -97,19 +85,6 @@ const warehouseBrowseConfig: BrowseConfig = {
     searchPlaceholder: 'Cari gudang...',
 };
 
-const adjustmentTypeBrowseConfig: BrowseConfig = {
-    endpoint: '/api/adjustment-types',
-    title: 'BROWSE TIPE PENYESUAIAN',
-    columns: [
-        { key: 'code', label: 'Kode', width: '100px' },
-        { key: 'name', label: 'Nama' },
-    ],
-    displayFormat: '{code} - {name}',
-    dropdownFormat: '{code} - {name}',
-    searchPlaceholder: 'Cari tipe...',
-    createRoute: '/master/adjustment-type/create',
-};
-
 const productBrowseConfig: BrowseConfig = {
     endpoint: '/api/products',
     title: 'BROWSE PRODUK',
@@ -124,7 +99,6 @@ const productBrowseConfig: BrowseConfig = {
 };
 
 // --- Event handlers ---
-
 const handleProductSelect = (row: DetailRow, productData: any) => {
     row._productData = productData;
     row._units = (productData.units || []).map((u: any) => ({
@@ -137,10 +111,10 @@ const handleProductSelect = (row: DetailRow, productData: any) => {
 };
 
 const loadBatches = async (row: DetailRow) => {
-    if (!row.product_id || !form.value.warehouse_id) return;
+    if (!row.product_id || !form.value.from_warehouse_id) return;
     try {
         const res = await axios.get('/api/stock-ledgers/batches', {
-            params: { product_id: row.product_id, warehouse_id: form.value.warehouse_id },
+            params: { product_id: row.product_id, warehouse_id: form.value.from_warehouse_id },
         });
         row._batchOptions = (res.data.data || []).map((b: any) => ({
             value: b.batch_number ?? '',
@@ -158,7 +132,6 @@ const mapDetailRow = (d: any): DetailRow => {
     }));
     return {
         product_id: d.product?.id || null,
-        direction: d.direction,
         batch_number: d.batch_number || '',
         unit_id: d.unit?.id || null,
         qty: Number(d.qty),
@@ -182,22 +155,19 @@ onMounted(() => {
         form.value = {
             code: data.code || '',
             status: data.status || 'draft',
-            // Normalize to YYYY-MM-DD regardless of what the API returns
             date: data.date ? String(data.date).substring(0, 10) : new Date().toISOString().substring(0, 10),
-            warehouse_id: data.warehouse?.id || null,
-            adjustment_type_id: data.adjustment_type?.id || null,
+            from_warehouse_id: data.from_warehouse?.id || null,
+            to_warehouse_id:   data.to_warehouse?.id   || null,
             description: data.description || '',
         };
         recordUuid.value = data.uuid || '';
-        if (data.warehouse) warehouseRowData.value = data.warehouse;
-        if (data.adjustment_type) adjustmentTypeRowData.value = data.adjustment_type;
+        if (data.from_warehouse) fromWarehouseRowData.value = data.from_warehouse;
+        if (data.to_warehouse)   toWarehouseRowData.value   = data.to_warehouse;
 
-        const mapped = (data.details || []).map(mapDetailRow);
-        inRows.value  = mapped.filter((r: DetailRow) => r.direction === 'in');
-        outRows.value = mapped.filter((r: DetailRow) => r.direction === 'out');
+        rows.value = (data.details || []).map(mapDetailRow);
 
-        // Pre-load batch options for all OUT rows that already have a product selected
-        outRows.value.forEach(row => loadBatches(row));
+        // Pre-load batch options for all rows that already have a product selected
+        rows.value.forEach(row => loadBatches(row));
     });
 });
 
@@ -207,7 +177,7 @@ const handleApprove = async () => {
     approveError.value = '';
     approving.value = true;
     try {
-        await axios.post(`/api/stock-adjustments/${recordUuid.value}/approve`);
+        await axios.post(`/api/stock-transfers/${recordUuid.value}/approve`);
         fetchData((data) => {
             form.value.code   = data.code   || '';
             form.value.status = data.status || 'posted';
@@ -224,7 +194,7 @@ const handleDisapprove = async () => {
     approveError.value = '';
     approving.value = true;
     try {
-        await axios.post(`/api/stock-adjustments/${recordUuid.value}/disapprove`);
+        await axios.post(`/api/stock-transfers/${recordUuid.value}/disapprove`);
         fetchData((data) => {
             form.value.code   = data.code   || '';
             form.value.status = data.status || 'draft';
@@ -260,18 +230,17 @@ const handlePrint = () => {
     });
 };
 
-// --- Submit (merge IN + OUT, direction already set per row) ---
+// --- Submit ---
 const onSubmit = () => handleSubmit(() => ({
     code: form.value.code,
     date: form.value.date,
-    warehouse_id: form.value.warehouse_id,
-    adjustment_type_id: form.value.adjustment_type_id,
+    from_warehouse_id: form.value.from_warehouse_id,
+    to_warehouse_id:   form.value.to_warehouse_id,
     description: form.value.description,
-    details: [...inRows.value, ...outRows.value]
+    details: rows.value
         .filter(r => r.product_id && r.unit_id && r.qty > 0)
         .map(r => ({
             product_id:   r.product_id,
-            direction:    r.direction,
             batch_number: r.batch_number || null,
             unit_id:      r.unit_id,
             qty:          r.qty,
@@ -294,7 +263,7 @@ const onSubmit = () => handleSubmit(() => ({
         @back="handleBack"
         @edit="handleEdit"
     >
-        <!-- Approve / Disapprove buttons (view mode only) -->
+        <!-- Approve / Disapprove / Print buttons (view mode only) -->
         <template v-if="mode === 'view'" #header-actions>
             <div class="flex items-center gap-2">
                 <button
@@ -329,7 +298,6 @@ const onSubmit = () => handleSubmit(() => ({
                     </svg>
                     {{ approving ? 'Memproses...' : 'Disapprove' }}
                 </button>
-                <!-- Print: only for posted -->
                 <button
                     v-if="form.status === 'posted'"
                     type="button"
@@ -347,7 +315,7 @@ const onSubmit = () => handleSubmit(() => ({
         <template #default="{ readonly }">
             <div class="space-y-4">
 
-                <!-- Approve / Disapprove error alert -->
+                <!-- Error alert -->
                 <div
                     v-if="approveError"
                     class="flex items-start gap-3 rounded-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700"
@@ -379,118 +347,50 @@ const onSubmit = () => handleSubmit(() => ({
                         <BaseDatePicker v-model="form.date" :disabled="readonly" />
                     </BaseFormRow>
 
-                    <BaseFormRow label="Gudang" required :error="formErrors.warehouse_id">
+                    <BaseFormRow label="Dari Gudang" required :error="formErrors.from_warehouse_id">
                         <BaseBrowse
-                            v-model="form.warehouse_id"
+                            v-model="form.from_warehouse_id"
                             :config="warehouseBrowseConfig"
-                            placeholder="Pilih gudang..."
+                            placeholder="Pilih gudang asal..."
                             :disabled="readonly"
-                            :row-data="warehouseRowData"
-                            @select="(row: any) => warehouseRowData = row"
+                            :row-data="fromWarehouseRowData"
+                            @select="(row: any) => fromWarehouseRowData = row"
                             @navigate="(route: string) => emit('navigate', route)"
                         />
                     </BaseFormRow>
 
-                    <BaseFormRow label="Tipe" required :error="formErrors.adjustment_type_id">
+                    <BaseFormRow label="Ke Gudang" required :error="formErrors.to_warehouse_id">
                         <BaseBrowse
-                            v-model="form.adjustment_type_id"
-                            :config="adjustmentTypeBrowseConfig"
-                            placeholder="Pilih tipe penyesuaian..."
+                            v-model="form.to_warehouse_id"
+                            :config="warehouseBrowseConfig"
+                            placeholder="Pilih gudang tujuan..."
                             :disabled="readonly"
-                            :row-data="adjustmentTypeRowData"
-                            @select="(row: any) => adjustmentTypeRowData = row"
+                            :row-data="toWarehouseRowData"
+                            @select="(row: any) => toWarehouseRowData = row"
                             @navigate="(route: string) => emit('navigate', route)"
                         />
                     </BaseFormRow>
 
                     <BaseFormRow label="Keterangan" class="col-span-2" :error="formErrors.description">
-                        <BaseInput v-model="form.description" placeholder="Keterangan penyesuaian" :disabled="readonly" />
+                        <BaseInput v-model="form.description" placeholder="Keterangan transfer" :disabled="readonly" />
                     </BaseFormRow>
                 </div>
 
-                <!-- ===== STOK MASUK ===== -->
+                <!-- Detail rows -->
                 <BaseGrid
-                    v-model="inRows"
+                    v-model="rows"
                     :columns="[
-                        { key: 'product_id',   label: 'Produk',     width: '200px' },
-                        { key: 'batch_number', label: 'Batch',      width: '140px' },
-                        { key: 'unit_id',      label: 'Satuan',     width: '120px' },
-                        { key: 'qty',          label: 'Qty',        width: '80px'  },
-                        { key: 'unit_cost',    label: 'Harga/Unit', width: '100px' },
+                        { key: 'product_id',   label: 'Produk',     width: '220px' },
+                        { key: 'batch_number', label: 'Batch',      width: '150px' },
+                        { key: 'unit_id',      label: 'Satuan',     width: '130px' },
+                        { key: 'qty',          label: 'Qty',        width: '90px'  },
+                        { key: 'unit_cost',    label: 'Harga/Unit', width: '110px' },
                         { key: 'description',  label: 'Keterangan' },
                     ]"
-                    title="Stok Masuk"
+                    title="Barang yang Ditransfer"
                     :disabled="readonly"
-                    :new-row="newInRow"
+                    :new-row="newRow"
                     :error="formErrors.details"
-                    :required-keys="['product_id', 'unit_id', 'qty']"
-                >
-                    <template #cell-product_id="{ row, disabled }">
-                        <BaseBrowse
-                            :modelValue="row.product_id"
-                            :config="productBrowseConfig"
-                            placeholder="Cari produk..."
-                            :row-data="row._productData"
-                            :disabled="disabled"
-                            @update:modelValue="(val: any) => row.product_id = val"
-                            @select="(pd: any) => { row.product_id = pd.id; handleProductSelect(row, pd); }"
-                            @navigate="(route: string) => emit('navigate', route)"
-                        />
-                    </template>
-
-                    <template #cell-batch_number="{ row, disabled }">
-                        <input
-                            v-model="row.batch_number"
-                            type="text"
-                            placeholder="No. Batch (opsional)"
-                            class="block w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                            :disabled="disabled"
-                        />
-                    </template>
-
-                    <template #cell-unit_id="{ row, disabled }">
-                        <select
-                            v-model="row.unit_id"
-                            class="block w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                            :disabled="disabled || !row.product_id"
-                        >
-                            <option :value="null">— pilih satuan —</option>
-                            <option v-for="u in row._units" :key="u.value" :value="u.value">{{ u.label }}</option>
-                        </select>
-                    </template>
-
-                    <template #cell-qty="{ row, disabled }">
-                        <input v-model.number="row.qty" type="number" step="0.0001" min="0.0001"
-                            class="block w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                            :disabled="disabled" />
-                    </template>
-
-                    <template #cell-unit_cost="{ row, disabled }">
-                        <input v-model.number="row.unit_cost" type="number" step="0.01" min="0"
-                            class="block w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                            :disabled="disabled" />
-                    </template>
-
-                    <template #cell-description="{ row, disabled }">
-                        <input v-model="row.description" type="text" placeholder="Keterangan baris"
-                            class="block w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
-                            :disabled="disabled" />
-                    </template>
-                </BaseGrid>
-
-                <!-- ===== STOK KELUAR ===== -->
-                <BaseGrid
-                    v-model="outRows"
-                    :columns="[
-                        { key: 'product_id',   label: 'Produk',   width: '200px' },
-                        { key: 'batch_number', label: 'Batch',    width: '140px' },
-                        { key: 'unit_id',      label: 'Satuan',   width: '120px' },
-                        { key: 'qty',          label: 'Qty',      width: '80px'  },
-                        { key: 'description',  label: 'Keterangan' },
-                    ]"
-                    title="Stok Keluar"
-                    :disabled="readonly"
-                    :new-row="newOutRow"
                     :required-keys="['product_id', 'unit_id', 'qty']"
                 >
                     <template #cell-product_id="{ row, disabled }">
@@ -537,6 +437,12 @@ const onSubmit = () => handleSubmit(() => ({
                             :disabled="disabled" />
                     </template>
 
+                    <template #cell-unit_cost="{ row, disabled }">
+                        <input v-model.number="row.unit_cost" type="number" step="0.01" min="0"
+                            class="block w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                            :disabled="disabled" />
+                    </template>
+
                     <template #cell-description="{ row, disabled }">
                         <input v-model="row.description" type="text" placeholder="Keterangan baris"
                             class="block w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
@@ -549,7 +455,7 @@ const onSubmit = () => handleSubmit(() => ({
 
         <template v-if="recordId" #tab-info>
             <AuditInfo
-                loggable-type="stock_adjustment"
+                loggable-type="stock_transfer"
                 :loggable-id="recordId"
                 :audit-data="auditData"
             />
@@ -560,7 +466,6 @@ const onSubmit = () => handleSubmit(() => ({
     <teleport to="body">
         <div v-if="showPrint" id="spirit-print-root" class="fixed inset-0 z-[9999] overflow-auto bg-white p-10 text-gray-900">
 
-            <!-- Close button (hidden on actual print) -->
             <button
                 class="no-print mb-6 inline-flex items-center gap-2 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
                 @click="showPrint = false"
@@ -571,12 +476,10 @@ const onSubmit = () => handleSubmit(() => ({
                 Tutup
             </button>
 
-            <!-- Document title -->
             <div class="mb-6 border-b-2 border-gray-800 pb-4 text-center">
-                <h1 class="text-xl font-bold uppercase tracking-wide">Penyesuaian Stok</h1>
+                <h1 class="text-xl font-bold uppercase tracking-wide">Transfer Stok</h1>
             </div>
 
-            <!-- Document info -->
             <table class="mb-6 w-full text-sm">
                 <tbody>
                     <tr>
@@ -588,12 +491,12 @@ const onSubmit = () => handleSubmit(() => ({
                         <td>{{ formatPrintDate(form.date) }}</td>
                     </tr>
                     <tr>
-                        <td class="py-0.5 font-medium text-gray-600">Gudang</td>
+                        <td class="py-0.5 font-medium text-gray-600">Dari Gudang</td>
                         <td class="text-center">:</td>
-                        <td>{{ warehouseRowData ? `${warehouseRowData.code} - ${warehouseRowData.name}` : '-' }}</td>
-                        <td class="py-0.5 font-medium text-gray-600">Tipe</td>
+                        <td>{{ fromWarehouseRowData ? `${fromWarehouseRowData.code} - ${fromWarehouseRowData.name}` : '-' }}</td>
+                        <td class="py-0.5 font-medium text-gray-600">Ke Gudang</td>
                         <td class="text-center">:</td>
-                        <td>{{ adjustmentTypeRowData ? `${adjustmentTypeRowData.code} - ${adjustmentTypeRowData.name}` : '-' }}</td>
+                        <td>{{ toWarehouseRowData ? `${toWarehouseRowData.code} - ${toWarehouseRowData.name}` : '-' }}</td>
                     </tr>
                     <tr v-if="form.description">
                         <td class="py-0.5 font-medium text-gray-600">Keterangan</td>
@@ -603,65 +506,33 @@ const onSubmit = () => handleSubmit(() => ({
                 </tbody>
             </table>
 
-            <!-- Stok Masuk -->
-            <template v-if="inRows.length">
-                <h2 class="mb-2 font-semibold">Stok Masuk</h2>
-                <table class="mb-6 w-full border-collapse text-sm">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="border border-gray-300 px-3 py-1.5 text-center">No.</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-left">Produk</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-left">Batch</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-left">Satuan</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-right">Qty</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-right">Harga/Unit</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-right">Nilai</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-left">Keterangan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(row, i) in inRows" :key="i">
-                            <td class="border border-gray-300 px-3 py-1 text-center">{{ i + 1 }}</td>
-                            <td class="border border-gray-300 px-3 py-1">{{ getProductLabel(row) }}</td>
-                            <td class="border border-gray-300 px-3 py-1">{{ row.batch_number || '-' }}</td>
-                            <td class="border border-gray-300 px-3 py-1">{{ getUnitLabel(row) }}</td>
-                            <td class="border border-gray-300 px-3 py-1 text-right">{{ fmtQty(row.qty) }}</td>
-                            <td class="border border-gray-300 px-3 py-1 text-right">{{ fmtCurrency(row.unit_cost) }}</td>
-                            <td class="border border-gray-300 px-3 py-1 text-right">{{ fmtCurrency(row.qty * row.unit_cost) }}</td>
-                            <td class="border border-gray-300 px-3 py-1">{{ row.description || '' }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </template>
+            <table class="mb-6 w-full border-collapse text-sm">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="border border-gray-300 px-3 py-1.5 text-center">No.</th>
+                        <th class="border border-gray-300 px-3 py-1.5 text-left">Produk</th>
+                        <th class="border border-gray-300 px-3 py-1.5 text-left">Batch</th>
+                        <th class="border border-gray-300 px-3 py-1.5 text-left">Satuan</th>
+                        <th class="border border-gray-300 px-3 py-1.5 text-right">Qty</th>
+                        <th class="border border-gray-300 px-3 py-1.5 text-right">Harga/Unit</th>
+                        <th class="border border-gray-300 px-3 py-1.5 text-right">Nilai</th>
+                        <th class="border border-gray-300 px-3 py-1.5 text-left">Keterangan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(row, i) in rows" :key="i">
+                        <td class="border border-gray-300 px-3 py-1 text-center">{{ i + 1 }}</td>
+                        <td class="border border-gray-300 px-3 py-1">{{ getProductLabel(row) }}</td>
+                        <td class="border border-gray-300 px-3 py-1">{{ row.batch_number || '-' }}</td>
+                        <td class="border border-gray-300 px-3 py-1">{{ getUnitLabel(row) }}</td>
+                        <td class="border border-gray-300 px-3 py-1 text-right">{{ fmtQty(row.qty) }}</td>
+                        <td class="border border-gray-300 px-3 py-1 text-right">{{ fmtCurrency(row.unit_cost) }}</td>
+                        <td class="border border-gray-300 px-3 py-1 text-right">{{ fmtCurrency(row.qty * row.unit_cost) }}</td>
+                        <td class="border border-gray-300 px-3 py-1">{{ row.description || '' }}</td>
+                    </tr>
+                </tbody>
+            </table>
 
-            <!-- Stok Keluar -->
-            <template v-if="outRows.length">
-                <h2 class="mb-2 font-semibold">Stok Keluar</h2>
-                <table class="mb-6 w-full border-collapse text-sm">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="border border-gray-300 px-3 py-1.5 text-center">No.</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-left">Produk</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-left">Batch</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-left">Satuan</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-right">Qty</th>
-                            <th class="border border-gray-300 px-3 py-1.5 text-left">Keterangan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(row, i) in outRows" :key="i">
-                            <td class="border border-gray-300 px-3 py-1 text-center">{{ i + 1 }}</td>
-                            <td class="border border-gray-300 px-3 py-1">{{ getProductLabel(row) }}</td>
-                            <td class="border border-gray-300 px-3 py-1">{{ row.batch_number || '-' }}</td>
-                            <td class="border border-gray-300 px-3 py-1">{{ getUnitLabel(row) }}</td>
-                            <td class="border border-gray-300 px-3 py-1 text-right">{{ fmtQty(row.qty) }}</td>
-                            <td class="border border-gray-300 px-3 py-1">{{ row.description || '' }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </template>
-
-            <!-- Signature -->
             <div class="mt-10 grid grid-cols-3 gap-8 text-sm">
                 <div class="text-center">
                     <p class="mb-16">Dibuat oleh,</p>

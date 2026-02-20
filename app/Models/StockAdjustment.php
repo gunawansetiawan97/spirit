@@ -25,7 +25,7 @@ class StockAdjustment extends Model
         'date' => 'date',
     ];
 
-    protected function validationRules(): array
+    public static function validationRules(): array
     {
         return [
             'code'               => "required|string|max:30|unique:stock_adjustments,code",

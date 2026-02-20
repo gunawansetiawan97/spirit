@@ -21,7 +21,7 @@ const isExpanded = (code: string) => expandedMenus.value.includes(code);
 
 const isActive = (route: string | null) => {
     if (!route) return false;
-    return window.location.pathname === route;
+    return uiStore.currentRoute === route;
 };
 
 const hasActiveChild = (children: any[] | undefined): boolean => {

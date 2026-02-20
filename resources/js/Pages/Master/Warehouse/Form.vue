@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { FormPage, BaseFormRow } from '@/Components/Form';
+import { FormPage, BaseFormRow, AuditInfo } from '@/Components/Form';
 import { BaseInput, BaseTextarea, BaseCheckbox } from '@/Components/Form';
 import { useFormPage } from '@/Composables';
 
@@ -95,6 +95,14 @@ const onSubmit = () => handleSubmit(() => ({
                     <BaseTextarea v-model="form.description" placeholder="Keterangan tambahan" :disabled="readonly" :rows="2" />
                 </BaseFormRow>
             </div>
+        </template>
+
+        <template v-if="recordId" #tab-info>
+            <AuditInfo
+                loggable-type="warehouse"
+                :loggable-id="recordId"
+                :audit-data="auditData"
+            />
         </template>
     </FormPage>
 </template>

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ProductUnit;
 use App\Models\StockLedger;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class StockLedgerService
@@ -15,19 +16,19 @@ class StockLedgerService
      *   transaction_date: string|Carbon,
      *   product_id: int,
      *   warehouse_id: int,
-     *   ref_type: string,   // e.g. 'StockAdjustment'
+     *   ref_type: string,        // e.g. 'StockAdjustment'
      *   ref_id: int,
-     *   uom_id: int,        // unit used for input
+     *   code: string|null,       // human-readable document code, e.g. 'SA-2026-0001'
+     *   uom_id: int,             // unit used for input
      *   batch_number: string|null,
-     *   qty_in: float,      // 0 if this is an out transaction
-     *   qty_out: float,     // 0 if this is an in transaction
-     *   unit_cost: float,   // optional, default 0
+     *   qty_in: float,           // 0 if this is an out transaction
+     *   qty_out: float,          // 0 if this is an in transaction
+     *   unit_cost: float,        // optional, default 0
      * }
      */
     public static function record(array $data): StockLedger
     {
         return DB::transaction(function () use ($data) {
-            // Get conversion factor from product_units
             $productUnit = ProductUnit::where('product_id', $data['product_id'])
                 ->where('unit_id', $data['uom_id'])
                 ->first();
@@ -40,10 +41,12 @@ class StockLedgerService
             $baseQtyIn  = $qtyIn  * $conversion;
             $baseQtyOut = $qtyOut * $conversion;
 
+            $batchNumber = !empty($data['batch_number']) ? $data['batch_number'] : null;
+
             // Get last balance for this product + warehouse + batch (with row lock)
             $lastLedger = StockLedger::where('product_id', $data['product_id'])
                 ->where('warehouse_id', $data['warehouse_id'])
-                ->where('batch_number', $data['batch_number'] ?? null)
+                ->where('batch_number', $batchNumber)
                 ->lockForUpdate()
                 ->latest('id')
                 ->first();
@@ -58,10 +61,12 @@ class StockLedgerService
                 'transaction_date' => $data['transaction_date'],
                 'product_id'       => $data['product_id'],
                 'warehouse_id'     => $data['warehouse_id'],
+                'branch_id'        => $data['branch_id'] ?? null,
                 'ref_type'         => $data['ref_type'],
                 'ref_id'           => $data['ref_id'],
+                'code'             => $data['code'] ?? null,
                 'uom_id'           => $data['uom_id'],
-                'batch_number'     => $data['batch_number'] ?? null,
+                'batch_number'     => $batchNumber,
                 'qty_in'           => $qtyIn,
                 'qty_out'          => $qtyOut,
                 'base_qty_in'      => $baseQtyIn,
@@ -86,8 +91,19 @@ class StockLedgerService
     }
 
     /**
-     * Reverse all stock ledger entries for a given ref (cancellation).
-     * Creates mirror entries with in/out swapped.
+     * Delete all stock ledger entries for a given ref.
+     * Use this instead of reverse() when you want a clean undo (no reversal rows).
+     */
+    public static function deleteByRef(string $refType, int $refId): void
+    {
+        StockLedger::where('ref_type', $refType)
+            ->where('ref_id', $refId)
+            ->delete();
+    }
+
+    /**
+     * Reverse all stock ledger entries for a given ref (append-style cancellation).
+     * Creates mirror entries with in/out swapped. Kept for modules that need audit trail.
      */
     public static function reverse(string $refType, int $refId): void
     {
@@ -103,6 +119,7 @@ class StockLedgerService
                     'warehouse_id'     => $entry->warehouse_id,
                     'ref_type'         => $refType . '/Reversal',
                     'ref_id'           => $refId,
+                    'code'             => $entry->code,
                     'uom_id'           => $entry->uom_id,
                     'batch_number'     => $entry->batch_number,
                     'qty_in'           => (float) $entry->qty_out,
@@ -114,8 +131,85 @@ class StockLedgerService
     }
 
     /**
+     * Get available stock qty for a product/warehouse/batch as of a given date.
+     * Used to validate that stock won't go negative when approving outbound movements.
+     */
+    public static function checkAvailableQty(
+        int $productId,
+        int $warehouseId,
+        ?string $batchNumber,
+        Carbon $asOfDate
+    ): float {
+        $batchNumber = !empty($batchNumber) ? $batchNumber : null;
+
+        $result = StockLedger::where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('batch_number', $batchNumber)
+            ->where('transaction_date', '<=', $asOfDate->toDateString())
+            ->selectRaw('SUM(base_qty_in) - SUM(base_qty_out) AS available_qty')
+            ->value('available_qty');
+
+        return (float) ($result ?? 0);
+    }
+
+    /**
+     * Get the minimum running balance for a product/warehouse/batch
+     * at any point from $fromDate onwards (inclusive).
+     *
+     * Used to validate that disapproving an IN document won't cause
+     * negative stock at any subsequent date.
+     *
+     * Algorithm:
+     *   1. Compute cumulative balance strictly BEFORE fromDate.
+     *   2. Walk all ledger rows from fromDate onwards in chronological order,
+     *      tracking the running cumulative balance.
+     *   3. Return the lowest value the running balance ever reaches.
+     *
+     * If min_balance >= qty_to_remove, disapproval is safe.
+     */
+    public static function checkMinBalanceFromDate(
+        int $productId,
+        int $warehouseId,
+        ?string $batchNumber,
+        string $fromDate   // YYYY-MM-DD
+    ): float {
+        $batchNumber = !empty($batchNumber) ? $batchNumber : null;
+
+        // Cumulative balance of all rows BEFORE fromDate
+        $balanceBefore = (float) StockLedger::where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('batch_number', $batchNumber)
+            ->where('transaction_date', '<', $fromDate)
+            ->selectRaw('COALESCE(SUM(base_qty_in) - SUM(base_qty_out), 0) AS bal')
+            ->value('bal');
+
+        // All ledger rows from fromDate onwards, ordered chronologically
+        $entries = StockLedger::where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('batch_number', $batchNumber)
+            ->where('transaction_date', '>=', $fromDate)
+            ->orderBy('transaction_date')
+            ->orderBy('id')
+            ->get(['base_qty_in', 'base_qty_out']);
+
+        if ($entries->isEmpty()) {
+            return $balanceBefore;
+        }
+
+        $minBalance = PHP_FLOAT_MAX;
+        $running    = $balanceBefore;
+
+        foreach ($entries as $entry) {
+            $running   += (float) $entry->base_qty_in - (float) $entry->base_qty_out;
+            $minBalance = min($minBalance, $running);
+        }
+
+        return $minBalance;
+    }
+
+    /**
      * Get available batch stocks for a product in a warehouse.
-     * Returns batches with positive base_balance.
+     * Returns batches with positive available qty.
      */
     public static function getAvailableBatches(int $productId, int $warehouseId): array
     {

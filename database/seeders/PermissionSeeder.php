@@ -52,9 +52,31 @@ class PermissionSeeder extends Seeder
                             ['code' => 'master.product.unit', 'name' => 'Unit', 'route' => '/master/unit', 'sort_order' => 1],
                             ['code' => 'master.product.product_category', 'name' => 'Kategori Produk', 'route' => '/master/product-category', 'sort_order' => 2],
                             ['code' => 'master.product.product_brand', 'name' => 'Merk Produk', 'route' => '/master/product-brand', 'sort_order' => 3],
-                            ['code' => 'master.product.product', 'name' => 'Produk', 'route' => '/master/product', 'sort_order' => 4], 
+                            ['code' => 'master.product.product', 'name' => 'Produk', 'route' => '/master/product', 'sort_order' => 4],
                         ]
                     ],
+                    [
+                        'code' => 'master.inventory',
+                        'name' => 'Inventori',
+                        'route' => null,
+                        'sort_order' => 8,
+                        'children' => [
+                            ['code' => 'master.inventory.warehouse', 'name' => 'Gudang', 'route' => '/master/warehouse', 'sort_order' => 1],
+                            ['code' => 'master.inventory.adjustment_type', 'name' => 'Tipe Penyesuaian', 'route' => '/master/adjustment-type', 'sort_order' => 2],
+                        ]
+                    ],
+                ],
+            ],
+            [
+                'code' => 'transaction',
+                'name' => 'Transaksi',
+                'icon' => 'ClipboardIcon',
+                'route' => null,
+                'type' => 'menu',
+                'sort_order' => 3,
+                'children' => [
+                    ['code' => 'transaction.stock_adjustment', 'name' => 'Penyesuaian Stok', 'route' => '/transaction/stock-adjustment', 'sort_order' => 1],
+                    ['code' => 'transaction.stock_transfer', 'name' => 'Transfer Stok', 'route' => '/transaction/stock-transfer', 'sort_order' => 2],
                 ],
             ],
             [

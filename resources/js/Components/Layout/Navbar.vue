@@ -49,8 +49,14 @@ const closeUserMenu = () => {
 
 onMounted(() => {
     uiStore.fetchBranches().then(() => {
-        // Set initial branch from user or first available
-        if (authStore.user?.branch) {
+        const savedId = localStorage.getItem('currentBranchId');
+        const savedBranch = savedId
+            ? uiStore.availableBranches.find(b => String(b.id) === savedId) ?? null
+            : null;
+
+        if (savedBranch) {
+            uiStore.setCurrentBranch(savedBranch);
+        } else if (authStore.user?.branch) {
             uiStore.setCurrentBranch(authStore.user.branch);
         } else if (uiStore.availableBranches.length > 0) {
             uiStore.setCurrentBranch(uiStore.availableBranches[0]);
@@ -140,12 +146,13 @@ onMounted(() => {
 
             <!-- Right side -->
             <div class="flex items-center gap-4">
-                <!-- Branch selector -->
+                <!-- Branch selector (disabled when a form is open) -->
                 <div class="hidden w-48 sm:block">
                     <BaseSelect
                         v-model="selectedBranchId"
                         :options="branchOptions"
                         placeholder="Pilih Cabang"
+                        :disabled="uiStore.formIsOpen"
                     />
                 </div>
 

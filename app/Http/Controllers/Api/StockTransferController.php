@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProductUnit;
-use App\Models\StockAdjustment;
+use App\Models\StockTransfer;
 use App\Services\NumberSequenceService;
 use App\Services\StockLedgerService;
 use App\Traits\HasIndexQuery;
@@ -13,18 +13,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
-class StockAdjustmentController extends Controller
+class StockTransferController extends Controller
 {
     use HasIndexQuery;
 
     public function index(Request $request)
     {
         return $this->paginatedResponse(
-            StockAdjustment::with(['warehouse:id,code,name', 'adjustmentType:id,code,name']),
+            StockTransfer::with(['fromWarehouse:id,code,name', 'toWarehouse:id,code,name']),
             $request,
             [
                 'searchFields'     => ['code', 'description'],
-                'filterFields'     => ['warehouse_id', 'adjustment_type_id', 'status'],
+                'filterFields'     => ['from_warehouse_id', 'to_warehouse_id', 'status'],
                 'defaultSort'      => 'date',
                 'defaultDirection' => 'desc',
             ]
@@ -34,111 +34,112 @@ class StockAdjustmentController extends Controller
     public function store(Request $request)
     {
         $request->validate($this->detailRules());
-
-        $request->validate(['code' => 'required|string|max:50|unique:stock_adjustments,code']);
+        $request->validate(['code' => 'required|string|max:50|unique:stock_transfers,code']);
 
         return DB::transaction(function () use ($request) {
-            $adjustment = StockAdjustment::create([
+            $transfer = StockTransfer::create([
                 'code'               => $request->code,
                 'date'               => $request->date,
-                'warehouse_id'       => $request->warehouse_id,
-                'adjustment_type_id' => $request->adjustment_type_id,
+                'from_warehouse_id'  => $request->from_warehouse_id,
+                'to_warehouse_id'    => $request->to_warehouse_id,
                 'description'        => $request->description,
                 'status'             => 'draft',
             ]);
 
-            $this->saveDetails($adjustment, $request->details ?? []);
+            $this->saveDetails($transfer, $request->details ?? []);
 
-            $adjustment->load([
-                'warehouse:id,code,name',
-                'adjustmentType:id,code,name',
+            $transfer->load([
+                'fromWarehouse:id,code,name',
+                'toWarehouse:id,code,name',
                 'details.product:id,code,name',
                 'details.unit:id,code,name',
             ]);
 
-            return $this->storeResponse($adjustment);
+            return $this->storeResponse($transfer);
         });
     }
 
-    public function show(StockAdjustment $stockAdjustment)
+    public function show(StockTransfer $stockTransfer)
     {
-        return $this->showResponse($stockAdjustment, [
-            'warehouse:id,uuid,code,name',
-            'adjustmentType:id,uuid,code,name',
+        return $this->showResponse($stockTransfer, [
+            'fromWarehouse:id,uuid,code,name',
+            'toWarehouse:id,uuid,code,name',
             'details.product:id,uuid,code,name',
             'details.product.units.unit:id,uuid,code,name',
             'details.unit:id,uuid,code,name',
         ]);
     }
 
-    public function update(Request $request, StockAdjustment $stockAdjustment)
+    public function update(Request $request, StockTransfer $stockTransfer)
     {
-        if ($stockAdjustment->status !== 'draft') {
+        if ($stockTransfer->status !== 'draft') {
             return response()->json(['message' => 'Dokumen yang sudah diapprove tidak dapat diubah.'], 422);
         }
 
         $request->validate($this->detailRules());
 
-        return DB::transaction(function () use ($request, $stockAdjustment) {
-            $stockAdjustment->update([
-                'date'               => $request->date,
-                'warehouse_id'       => $request->warehouse_id,
-                'adjustment_type_id' => $request->adjustment_type_id,
-                'description'        => $request->description,
+        return DB::transaction(function () use ($request, $stockTransfer) {
+            $stockTransfer->update([
+                'date'              => $request->date,
+                'from_warehouse_id' => $request->from_warehouse_id,
+                'to_warehouse_id'   => $request->to_warehouse_id,
+                'description'       => $request->description,
             ]);
 
-            $oldDetails = $stockAdjustment->details()
+            $oldDetails = $stockTransfer->details()
                 ->with('product:id,name', 'unit:id,code')
                 ->get();
             $oldRows = $this->formatDetailRows($oldDetails);
 
-            $stockAdjustment->details()->delete();
-            $this->saveDetails($stockAdjustment, $request->details ?? []);
+            $stockTransfer->details()->delete();
+            $this->saveDetails($stockTransfer, $request->details ?? []);
 
-            $newDetails = $stockAdjustment->details()
+            $newDetails = $stockTransfer->details()
                 ->with('product:id,name', 'unit:id,code')
                 ->get();
             $newRows = $this->formatDetailRows($newDetails);
 
-            $stockAdjustment->logActivity('children_updated', [
+            $stockTransfer->logActivity('children_updated', [
                 'old' => $oldRows,
                 'new' => $newRows,
             ]);
 
-            $stockAdjustment->load([
-                'warehouse:id,code,name',
-                'adjustmentType:id,code,name',
+            $stockTransfer->load([
+                'fromWarehouse:id,code,name',
+                'toWarehouse:id,code,name',
                 'details.product:id,code,name',
                 'details.unit:id,code,name',
             ]);
 
-            return $this->updateResponse($stockAdjustment);
+            return $this->updateResponse($stockTransfer);
         });
     }
 
-    public function destroy(StockAdjustment $stockAdjustment)
+    public function destroy(StockTransfer $stockTransfer)
     {
-        if ($stockAdjustment->status !== 'draft') {
+        if ($stockTransfer->status !== 'draft') {
             return response()->json(['message' => 'Dokumen yang sudah diapprove tidak dapat dihapus.'], 422);
         }
 
-        $stockAdjustment->delete();
+        $stockTransfer->delete();
 
-        return $this->destroyResponse($stockAdjustment);
+        return $this->destroyResponse($stockTransfer);
     }
 
-    public function approve(StockAdjustment $stockAdjustment)
+    public function approve(StockTransfer $stockTransfer)
     {
-        if ($stockAdjustment->status !== 'draft') {
+        if ($stockTransfer->status !== 'draft') {
             return response()->json(['message' => 'Dokumen sudah diapprove sebelumnya.'], 422);
         }
 
-        $details = $stockAdjustment->details()->with('product:id,name')->get();
+        $details = $stockTransfer->details()->with('product:id,name')->get();
 
-        // Stock availability check for all outbound rows
+        if ($details->isEmpty()) {
+            return response()->json(['message' => 'Dokumen tidak memiliki detail barang.'], 422);
+        }
+
+        // Stock availability check — source warehouse must have enough stock
         foreach ($details as $detail) {
-            if ($detail->direction !== 'out') continue;
-
             $productUnit = ProductUnit::where('product_id', $detail->product_id)
                 ->where('unit_id', $detail->unit_id)
                 ->first();
@@ -147,9 +148,9 @@ class StockAdjustmentController extends Controller
 
             $available = StockLedgerService::checkAvailableQty(
                 $detail->product_id,
-                $stockAdjustment->warehouse_id,
+                $stockTransfer->from_warehouse_id,
                 $detail->batch_number,
-                Carbon::parse($stockAdjustment->date)
+                Carbon::parse($stockTransfer->date)
             );
 
             if ($available < $requiredBaseQty) {
@@ -164,67 +165,79 @@ class StockAdjustmentController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($stockAdjustment, $details) {
-            // Generate real code only if still holding a draft placeholder
-            $isDraftCode = str_starts_with($stockAdjustment->code, 'AUTOCODE/')
-                        || str_starts_with($stockAdjustment->code, 'DRAFT-');
+        return DB::transaction(function () use ($stockTransfer, $details) {
+            $isDraftCode = str_starts_with($stockTransfer->code, 'AUTOCODE/')
+                        || str_starts_with($stockTransfer->code, 'DRAFT-');
             $realCode = $isDraftCode
-                ? NumberSequenceService::generate('stock-adjustment')
-                : $stockAdjustment->code;
+                ? NumberSequenceService::generate('stock-transfer')
+                : $stockTransfer->code;
 
-            // Delete any previous ledger entries (e.g. from a prior approve cycle)
-            StockLedgerService::deleteByRef('StockAdjustment', $stockAdjustment->id);
+            StockLedgerService::deleteByRef('StockTransfer', $stockTransfer->id);
 
             foreach ($details as $detail) {
+                $qty = (float) $detail->qty;
+
+                // OUT from source warehouse
                 StockLedgerService::record([
-                    'transaction_date' => $stockAdjustment->date,
+                    'transaction_date' => $stockTransfer->date,
                     'product_id'       => $detail->product_id,
-                    'warehouse_id'     => $stockAdjustment->warehouse_id,
-                    'branch_id'        => $stockAdjustment->branch_id,
-                    'ref_type'         => 'StockAdjustment',
-                    'ref_id'           => $stockAdjustment->id,
+                    'warehouse_id'     => $stockTransfer->from_warehouse_id,
+                    'branch_id'        => $stockTransfer->branch_id,
+                    'ref_type'         => 'StockTransfer',
+                    'ref_id'           => $stockTransfer->id,
                     'code'             => $realCode,
                     'uom_id'           => $detail->unit_id,
                     'batch_number'     => $detail->batch_number,
-                    'qty_in'           => $detail->direction === 'in'  ? (float) $detail->qty : 0,
-                    'qty_out'          => $detail->direction === 'out' ? (float) $detail->qty : 0,
+                    'qty_in'           => 0,
+                    'qty_out'          => $qty,
+                    'unit_cost'        => (float) ($detail->unit_cost ?? 0),
+                ]);
+
+                // IN to destination warehouse
+                StockLedgerService::record([
+                    'transaction_date' => $stockTransfer->date,
+                    'product_id'       => $detail->product_id,
+                    'warehouse_id'     => $stockTransfer->to_warehouse_id,
+                    'branch_id'        => $stockTransfer->branch_id,
+                    'ref_type'         => 'StockTransfer',
+                    'ref_id'           => $stockTransfer->id,
+                    'code'             => $realCode,
+                    'uom_id'           => $detail->unit_id,
+                    'batch_number'     => $detail->batch_number,
+                    'qty_in'           => $qty,
+                    'qty_out'          => 0,
                     'unit_cost'        => (float) ($detail->unit_cost ?? 0),
                 ]);
             }
 
-            $stockAdjustment->update([
+            $stockTransfer->update([
                 'code'   => $realCode,
                 'status' => 'posted',
             ]);
 
-            // Record who approved and when
-            $stockAdjustment->approved_by = Auth::id();
-            $stockAdjustment->approved_at = now();
-            $stockAdjustment->saveQuietly();
-            $stockAdjustment->logActivity('approved');
+            $stockTransfer->approved_by = Auth::id();
+            $stockTransfer->approved_at = now();
+            $stockTransfer->saveQuietly();
+            $stockTransfer->logActivity('approved');
 
-            return $this->updateResponse($stockAdjustment->fresh([
-                'warehouse:id,code,name',
-                'adjustmentType:id,code,name',
+            return $this->updateResponse($stockTransfer->fresh([
+                'fromWarehouse:id,code,name',
+                'toWarehouse:id,code,name',
             ]));
         });
     }
 
-    public function disapprove(StockAdjustment $stockAdjustment)
+    public function disapprove(StockTransfer $stockTransfer)
     {
-        if ($stockAdjustment->status !== 'posted') {
+        if ($stockTransfer->status !== 'posted') {
             return response()->json(['message' => 'Hanya dokumen yang sudah diapprove yang dapat di-disapprove.'], 422);
         }
 
-        $details  = $stockAdjustment->details()->with('product:id,name')->get();
-        $fromDate = Carbon::parse($stockAdjustment->date)->toDateString();
+        $details  = $stockTransfer->details()->with('product:id,name')->get();
+        $fromDate = Carbon::parse($stockTransfer->date)->toDateString();
 
-        // For each IN row, ensure removing it won't make any later date's balance negative.
-        // We compute the minimum running balance from the document date onwards;
-        // if min_balance < qty_being_removed, some date after this document would go negative.
+        // Ensure removing the IN entries (to_warehouse) won't cause negative stock
         foreach ($details as $detail) {
-            if ($detail->direction !== 'in') continue;
-
             $productUnit = ProductUnit::where('product_id', $detail->product_id)
                 ->where('unit_id', $detail->unit_id)
                 ->first();
@@ -233,7 +246,7 @@ class StockAdjustmentController extends Controller
 
             $minBalance = StockLedgerService::checkMinBalanceFromDate(
                 $detail->product_id,
-                $stockAdjustment->warehouse_id,
+                $stockTransfer->to_warehouse_id,
                 $detail->batch_number,
                 $fromDate
             );
@@ -242,29 +255,27 @@ class StockAdjustmentController extends Controller
                 $productName = $detail->product?->name ?? "ID #{$detail->product_id}";
                 $batchInfo   = $detail->batch_number ? " (batch: {$detail->batch_number})" : '';
                 return response()->json([
-                    'message' => "Tidak dapat membatalkan: stok {$productName}{$batchInfo} sudah digunakan oleh transaksi lain. "
-                               . "Saldo minimum setelah tanggal ini: " . number_format($minBalance, 4, ',', '.') . ", "
+                    'message' => "Tidak dapat membatalkan: stok {$productName}{$batchInfo} di gudang tujuan sudah digunakan. "
+                               . "Saldo minimum: " . number_format($minBalance, 4, ',', '.') . ", "
                                . "akan dihapus: " . number_format($baseQtyToRemove, 4, ',', '.') . ".",
                     'errors'  => ['stock' => ['Stok sudah terpakai oleh transaksi lain.']],
                 ], 422);
             }
         }
 
-        DB::transaction(function () use ($stockAdjustment) {
-            // Delete ledger entries cleanly (no reversal rows)
-            StockLedgerService::deleteByRef('StockAdjustment', $stockAdjustment->id);
-            $stockAdjustment->update(['status' => 'draft']);
+        DB::transaction(function () use ($stockTransfer) {
+            StockLedgerService::deleteByRef('StockTransfer', $stockTransfer->id);
+            $stockTransfer->update(['status' => 'draft']);
 
-            // Clear approval fields and log who cancelled
-            $stockAdjustment->approved_by = null;
-            $stockAdjustment->approved_at = null;
-            $stockAdjustment->saveQuietly();
-            $stockAdjustment->logActivity('unapproved');
+            $stockTransfer->approved_by = null;
+            $stockTransfer->approved_at = null;
+            $stockTransfer->saveQuietly();
+            $stockTransfer->logActivity('unapproved');
         });
 
-        return $this->updateResponse($stockAdjustment->fresh([
-            'warehouse:id,code,name',
-            'adjustmentType:id,code,name',
+        return $this->updateResponse($stockTransfer->fresh([
+            'fromWarehouse:id,code,name',
+            'toWarehouse:id,code,name',
         ]));
     }
 
@@ -274,12 +285,11 @@ class StockAdjustmentController extends Controller
     {
         return [
             'date'               => 'required|date',
-            'warehouse_id'       => 'required|exists:warehouses,id',
-            'adjustment_type_id' => 'required|exists:adjustment_types,id',
+            'from_warehouse_id'  => 'required|exists:warehouses,id',
+            'to_warehouse_id'    => 'required|exists:warehouses,id|different:from_warehouse_id',
             'description'        => 'nullable|string',
             'details'            => 'required|array|min:1',
             'details.*.product_id'   => 'required|exists:products,id',
-            'details.*.direction'    => 'required|in:in,out',
             'details.*.batch_number' => 'nullable|string|max:50',
             'details.*.unit_id'      => 'required|exists:units,id',
             'details.*.qty'          => 'required|numeric|min:0.0001',
@@ -291,23 +301,18 @@ class StockAdjustmentController extends Controller
     private function formatDetailRows($details): array
     {
         return $details->map(fn($d) => [
-            'direction' => $d->direction,
-            'product'   => $d->product?->name ?? '-',
-            'qty'       => (float) $d->qty,
-            'unit'      => $d->unit?->code ?? '-',
-            'batch'     => $d->batch_number ?: null,
+            'product'  => $d->product?->name ?? '-',
+            'qty'      => (float) $d->qty,
+            'unit'     => $d->unit?->code ?? '-',
+            'batch'    => $d->batch_number ?: null,
         ])->values()->toArray();
     }
 
-    /**
-     * Save detail rows only (no ledger entries — those are posted on approve).
-     */
-    private function saveDetails(StockAdjustment $adjustment, array $details): void
+    private function saveDetails(StockTransfer $transfer, array $details): void
     {
         foreach ($details as $row) {
-            $adjustment->details()->create([
+            $transfer->details()->create([
                 'product_id'   => $row['product_id'],
-                'direction'    => $row['direction'],
                 'batch_number' => !empty($row['batch_number']) ? $row['batch_number'] : null,
                 'unit_id'      => $row['unit_id'],
                 'qty'          => $row['qty'],

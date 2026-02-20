@@ -22,7 +22,7 @@ class Warehouse extends Model
         'is_active' => 'boolean',
     ];
 
-    protected function validationRules(): array
+    public static function validationRules(): array
     {
         return [
             'code' => "required|string|max:20|unique:warehouses,code",

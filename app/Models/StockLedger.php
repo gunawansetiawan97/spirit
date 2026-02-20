@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class StockLedger extends Model
 {
     protected $fillable = [
-        'transaction_date', 'product_id', 'warehouse_id',
-        'ref_type', 'ref_id', 'uom_id', 'batch_number',
+        'transaction_date', 'product_id', 'warehouse_id', 'branch_id',
+        'ref_type', 'ref_id', 'code', 'uom_id', 'batch_number',
         'qty_in', 'qty_out', 'base_qty_in', 'base_qty_out', 'base_balance',
         'unit_cost', 'total_value',
     ];

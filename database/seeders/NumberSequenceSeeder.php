@@ -136,6 +136,28 @@ class NumberSequenceSeeder extends Seeder
                 'sequence_length' => 4,
             ],
 
+            // ===== MASTER INVENTORY =====
+            [
+                'code' => 'warehouse',
+                'name' => 'Penomoran Gudang',
+                'prefix' => 'GDG',
+                'separator' => '-',
+                'format' => '{prefix}-{seq}',
+                'reset_type' => 'none',
+                'scope_type' => 'global',
+                'sequence_length' => 4,
+            ],
+            [
+                'code' => 'adjustment-type',
+                'name' => 'Penomoran Tipe Penyesuaian',
+                'prefix' => 'TP',
+                'separator' => '-',
+                'format' => '{prefix}-{seq}',
+                'reset_type' => 'none',
+                'scope_type' => 'global',
+                'sequence_length' => 4,
+            ],
+
             // ===== INVENTORY (monthly, per branch) =====
             [
                 'code' => 'stock-transfer',

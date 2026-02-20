@@ -293,6 +293,12 @@ export function useIndexPage(config: IndexPageConfig, emit: NavigateEmit) {
         }
     };
 
+    // Refetch when active branch changes
+    watch(() => uiStore.currentBranch, () => {
+        currentPage.value = 1;
+        fetchData();
+    });
+
     // Initialize
     onMounted(() => {
         uiStore.setPageTitle(title);

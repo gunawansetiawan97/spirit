@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useUiStore } from '@/stores/ui';
 
@@ -22,6 +22,7 @@ type NavigateEmit = (event: 'navigate', route: string) => void;
 const AUDIT_RELATION_MAP: Record<string, string> = {
     createdBy: 'created_by_user',
     updatedBy: 'updated_by_user',
+    deletedBy: 'deleted_by_user',
     approvedBy: 'approved_by_user',
     printedBy: 'printed_by_user',
 };
@@ -29,6 +30,7 @@ const AUDIT_RELATION_MAP: Record<string, string> = {
 const AUDIT_TIMESTAMP_MAP: Record<string, string> = {
     createdBy: 'created_at',
     updatedBy: 'updated_at',
+    deletedBy: 'deleted_at',
     approvedBy: 'approved_at',
     printedBy: 'printed_at',
 };
@@ -43,6 +45,10 @@ export function useFormPage(config: FormPageConfig, props: FormPageProps, emit: 
         auditType,
         auditRelations = ['createdBy', 'updatedBy'],
     } = config;
+
+    // Mark form as open so branch switching is disabled while this form is active
+    onMounted(() => uiStore.setFormOpen(true));
+    onUnmounted(() => uiStore.setFormOpen(false));
 
     // State
     const loading = ref(!!props.id);
@@ -102,6 +108,13 @@ export function useFormPage(config: FormPageConfig, props: FormPageProps, emit: 
         try {
             const response = await axios.get(`${apiEndpoint}/${props.id}`);
             const data = response.data.data;
+
+            // If document has a branch and it doesn't match the active branch, redirect
+            if (data.branch_id && uiStore.currentBranch && data.branch_id !== uiStore.currentBranch.id) {
+                alert(`Dokumen ini milik cabang lain. Silakan ganti cabang terlebih dahulu.`);
+                emit('navigate', basePath);
+                return;
+            }
 
             mapData(data);
 

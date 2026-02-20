@@ -23,7 +23,7 @@ class AdjustmentType extends Model
         'is_active' => 'boolean',
     ];
 
-    protected function validationRules(): array
+    public static function validationRules(): array
     {
         return [
             'code' => "required|string|max:20|unique:adjustment_types,code",

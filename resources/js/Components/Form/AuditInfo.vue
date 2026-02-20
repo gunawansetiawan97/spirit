@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 
 interface AuditData {
     created_by?: { id: number; name: string } | null;
     updated_by?: { id: number; name: string } | null;
+    deleted_by?: { id: number; name: string } | null;
     approved_by?: { id: number; name: string } | null;
     printed_by?: { id: number; name: string } | null;
     created_at?: string | null;
     updated_at?: string | null;
+    deleted_at?: string | null;
     approved_at?: string | null;
     printed_at?: string | null;
 }
@@ -73,6 +75,19 @@ const formatValue = (value: any): string => {
     if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
     return String(value);
 };
+
+const formatDetailRow = (row: any): string => {
+    const dir = row.direction === 'in' ? 'Masuk' : 'Keluar';
+    const batch = row.batch ? ` [Batch: ${row.batch}]` : '';
+    return `${dir} | ${row.product} × ${row.qty} ${row.unit}${batch}`;
+};
+
+const isRowsFormat = (changes: any): boolean => {
+    return Array.isArray(changes?.old) && Array.isArray(changes?.new);
+};
+
+// Compute last unapproved event from fetched logs (for "Dibatalkan oleh" summary)
+const lastUnapprovedLog = computed(() => logs.value.find(l => l.action === 'unapproved') ?? null);
 
 const fetchLogs = async (page = 1) => {
     loading.value = true;
@@ -145,23 +160,43 @@ onMounted(() => {
 
                 <!-- Approved -->
                 <div v-if="auditData?.approved_at !== undefined" class="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-                    <div class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full" :class="auditData?.approved_at ? 'bg-emerald-100' : 'bg-gray-100'">
-                        <svg v-if="auditData?.approved_at" class="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                        <svg class="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <svg v-else class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
                     <div>
-                        <p class="text-xs font-medium text-gray-500">Status Approval</p>
-                        <p class="text-sm font-semibold" :class="auditData?.approved_at ? 'text-emerald-600' : 'text-gray-500'">
-                            {{ auditData?.approved_at ? 'Approved' : 'Belum Approved' }}
-                        </p>
-                        <template v-if="auditData?.approved_at">
-                            <p class="text-xs text-gray-600">{{ auditData?.approved_by?.name || '-' }}</p>
-                            <p class="text-xs text-gray-500">{{ formatDate(auditData?.approved_at) }}</p>
-                        </template>
+                        <p class="text-xs font-medium text-gray-500">Disetujui oleh</p>
+                        <p class="text-sm font-semibold text-gray-900">{{ auditData?.approved_by?.name || '-' }}</p>
+                        <p class="text-xs text-gray-500">{{ formatDate(auditData?.approved_at) }}</p>
+                    </div>
+                </div>
+
+                <!-- Unapproved (Dibatalkan) — computed from activity logs -->
+                <div v-if="lastUnapprovedLog" class="flex items-start gap-3 rounded-lg border border-amber-100 bg-amber-50 p-3">
+                    <div class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-100">
+                        <svg class="h-4 w-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-amber-600">Dibatalkan oleh</p>
+                        <p class="text-sm font-semibold text-gray-900">{{ lastUnapprovedLog.user?.name || '-' }}</p>
+                        <p class="text-xs text-gray-500">{{ formatDate(lastUnapprovedLog.created_at) }}</p>
+                    </div>
+                </div>
+
+                <!-- Deleted -->
+                <div v-if="auditData?.deleted_at !== undefined && auditData?.deleted_at" class="flex items-start gap-3 rounded-lg border border-red-100 bg-red-50 p-3">
+                    <div class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
+                        <svg class="h-4 w-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-red-600">Dihapus oleh</p>
+                        <p class="text-sm font-semibold text-gray-900">{{ auditData?.deleted_by?.name || '-' }}</p>
+                        <p class="text-xs text-gray-500">{{ formatDate(auditData?.deleted_at) }}</p>
                     </div>
                 </div>
 
@@ -173,14 +208,9 @@ onMounted(() => {
                         </svg>
                     </div>
                     <div>
-                        <p class="text-xs font-medium text-gray-500">Status Cetak</p>
-                        <p class="text-sm font-semibold" :class="auditData?.printed_at ? 'text-purple-600' : 'text-gray-500'">
-                            {{ auditData?.printed_at ? 'Sudah Dicetak' : 'Belum Dicetak' }}
-                        </p>
-                        <template v-if="auditData?.printed_at">
-                            <p class="text-xs text-gray-600">{{ auditData?.printed_by?.name || '-' }}</p>
-                            <p class="text-xs text-gray-500">{{ formatDate(auditData?.printed_at) }}</p>
-                        </template>
+                        <p class="text-xs font-medium text-gray-500">Dicetak oleh</p>
+                        <p class="text-sm font-semibold text-gray-900">{{ auditData?.printed_by?.name || '-' }}</p>
+                        <p class="text-xs text-gray-500">{{ formatDate(auditData?.printed_at) }}</p>
                     </div>
                 </div>
             </div>
@@ -227,8 +257,8 @@ onMounted(() => {
                             <span class="flex-shrink-0 text-xs text-gray-500">{{ formatDate(log.created_at) }}</span>
                         </div>
 
-                        <!-- Changes detail (field updates & children) -->
-                        <div v-if="log.changes && (log.action === 'updated' || log.action === 'children_updated')" class="mt-2 space-y-1">
+                        <!-- Changes detail (field updates) -->
+                        <div v-if="log.changes && log.action === 'updated'" class="mt-2 space-y-1">
                             <div
                                 v-for="(newVal, key) in log.changes.new"
                                 :key="String(key)"
@@ -241,6 +271,46 @@ onMounted(() => {
                                 </svg>
                                 <span class="text-green-600">{{ formatValue(newVal) }}</span>
                             </div>
+                        </div>
+
+                        <!-- Children detail rows (before/after) -->
+                        <div v-if="log.changes && log.action === 'children_updated'" class="mt-2">
+                            <!-- Row format: array of detail objects -->
+                            <template v-if="isRowsFormat(log.changes)">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <p class="mb-1 text-xs font-medium text-gray-400">Sebelum ({{ log.changes.old.length }} baris)</p>
+                                        <div class="space-y-0.5">
+                                            <div
+                                                v-for="(row, i) in log.changes.old"
+                                                :key="i"
+                                                class="rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-600"
+                                            >{{ formatDetailRow(row) }}</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p class="mb-1 text-xs font-medium text-gray-400">Sesudah ({{ log.changes.new.length }} baris)</p>
+                                        <div class="space-y-0.5">
+                                            <div
+                                                v-for="(row, i) in log.changes.new"
+                                                :key="i"
+                                                class="rounded bg-green-50 px-1.5 py-0.5 text-xs text-green-600"
+                                            >{{ formatDetailRow(row) }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                            <!-- Fallback: key-value format (legacy) -->
+                            <template v-else>
+                                <div v-for="(newVal, key) in log.changes.new" :key="String(key)" class="flex items-baseline gap-2 text-xs">
+                                    <span class="font-medium text-gray-600">{{ key }}:</span>
+                                    <span class="text-red-500 line-through">{{ formatValue((log.changes.old as any)[key as string]) }}</span>
+                                    <svg class="h-3 w-3 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                    <span class="text-green-600">{{ formatValue(newVal) }}</span>
+                                </div>
+                            </template>
                         </div>
 
                         <!-- IP Address -->

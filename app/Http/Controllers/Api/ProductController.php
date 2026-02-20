@@ -18,7 +18,7 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         return $this->paginatedResponse(
-            Product::with(['category:id,code,name', 'brand:id,code,name']),
+            Product::with(['category:id,code,name', 'brand:id,code,name', 'units.unit:id,code,name']),
             $request,
             [
                 'searchFields' => ['code', 'name'],

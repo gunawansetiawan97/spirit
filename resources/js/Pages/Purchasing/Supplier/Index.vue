@@ -15,29 +15,30 @@ const {
     navigateToEdit, handleDelete, handleFilter, handleFilterReset,
     handleFilterUpdate, handleExportExcel, handleExportPdf,
 } = useIndexPage({
-    title: 'Tipe Penyesuaian Stok',
-    entityName: 'adjustment-type',
-    entityLabel: 'Tipe Penyesuaian',
-    apiEndpoint: '/api/adjustment-types',
-    basePath: '/master/adjustment-type',
+    title: 'Master Supplier',
+    entityName: 'supplier',
+    entityLabel: 'Supplier',
+    apiEndpoint: '/api/suppliers',
+    basePath: '/purchasing/supplier',
+    permissionPrefix: 'purchasing.supplier',
     columns: [
-        { key: 'code', label: 'Kode', width: '120px', sortable: true },
-        { key: 'name', label: 'Nama', sortable: true },
-        {
-            key: 'coa',
-            label: 'COA',
-            formatter: (v: any) => v ? `${v.code} - ${v.name}` : '-',
-        },
+        { key: 'code',    label: 'Kode',     width: '120px', sortable: true },
+        { key: 'name',    label: 'Nama',                     sortable: true },
+        { key: 'phone',   label: 'No. Telp', width: '140px' },
+        { key: 'city',    label: 'Kota',     width: '130px' },
         { key: 'is_active', label: 'Status', width: '100px', align: 'center', type: 'status' },
     ],
     filters: [
-        { key: 'is_active', label: 'Status', type: 'select', options: [
-            { value: '', label: 'Semua' },
-            { value: '1', label: 'Aktif' },
-            { value: '0', label: 'Nonaktif' },
-        ]},
+        {
+            key: 'is_active', label: 'Status', type: 'select',
+            options: [
+                { value: '',  label: 'Semua'    },
+                { value: '1', label: 'Aktif'    },
+                { value: '0', label: 'Nonaktif' },
+            ],
+        },
     ],
-    permissionPrefix: 'master.inventory.adjustment_type',
+    searchPlaceholder: 'Cari kode / nama / telp / kota...',
 }, emit);
 </script>
 
@@ -71,7 +72,6 @@ const {
                 @filter-reset="handleFilterReset"
                 @export-excel="handleExportExcel"
                 @export-pdf="handleExportPdf"
-                @row-click="navigateToView"
                 @action-view="navigateToView"
                 @action-edit="navigateToEdit"
                 @create="navigateToCreate"

@@ -17,12 +17,14 @@ interface Props {
     backRoute?: string;
     tabs?: Tab[];
     activeTab?: string;
+    allowEdit?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
     saving: false,
     backRoute: '',
+    allowEdit: true,
 });
 
 const emit = defineEmits<{
@@ -56,7 +58,7 @@ const pageTitle = computed(() => {
 
 const isReadonly = computed(() => props.mode === 'view');
 const showSubmit = computed(() => props.mode !== 'view');
-const showEdit = computed(() => props.mode === 'view');
+const showEdit = computed(() => props.mode === 'view' && props.allowEdit);
 
 const handleBack = () => {
     emit('back');

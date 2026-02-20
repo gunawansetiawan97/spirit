@@ -19,7 +19,9 @@ use App\Http\Controllers\Api\ProductBrandController;
 use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Controllers\Api\AdjustmentTypeController;
 use App\Http\Controllers\Api\StockAdjustmentController;
+use App\Http\Controllers\Api\StockTransferController;
 use App\Http\Controllers\Api\StockLedgerController;
+use App\Http\Controllers\Api\SupplierController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -101,10 +103,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('/adjustment-types', AdjustmentTypeController::class);
 
     // Stock Adjustments
+    Route::post('/stock-adjustments/{stock_adjustment}/approve', [StockAdjustmentController::class, 'approve']);
+    Route::post('/stock-adjustments/{stock_adjustment}/disapprove', [StockAdjustmentController::class, 'disapprove']);
     Route::apiResource('/stock-adjustments', StockAdjustmentController::class);
+
+    // Stock Transfers
+    Route::post('/stock-transfers/{stock_transfer}/approve', [StockTransferController::class, 'approve']);
+    Route::post('/stock-transfers/{stock_transfer}/disapprove', [StockTransferController::class, 'disapprove']);
+    Route::apiResource('/stock-transfers', StockTransferController::class);
 
     // Stock Ledger
     Route::get('/stock-ledgers/batches', [StockLedgerController::class, 'batches']);
+
+    // Suppliers
+    Route::get('/suppliers/list', [SupplierController::class, 'all']);
+    Route::apiResource('/suppliers', SupplierController::class);
 
     // Activity Logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);

@@ -1,83 +1,78 @@
 <script setup lang="ts">
+import { DataTable } from '@/Components/Table';
 import { useIndexPage } from '@/Composables';
 
-const emit = defineEmits<{ (e: 'navigate', route: string): void }>();
+const emit = defineEmits<{
+    (e: 'navigate', route: string): void;
+}>();
 
-const { loading, rows, meta, filters, sort, handleSearch, handlePageChange, handleSort, handleRowClick, handleCreate } =
-    useIndexPage({
-        apiEndpoint: '/api/warehouses',
-        basePath: '/master/warehouse',
-        searchFields: ['code', 'name'],
-    }, emit);
+const {
+    data, loading, currentPage, perPage, total, search,
+    isDeleting, isExporting, filterValues,
+    columns, actions, createButton, deleteDialog,
+    searchPlaceholder, filters, exportConfig,
+    fetchData, handleSearch, navigateToCreate, navigateToView,
+    navigateToEdit, handleDelete, handleFilter, handleFilterReset,
+    handleFilterUpdate, handleExportExcel, handleExportPdf,
+} = useIndexPage({
+    title: 'Master Gudang',
+    entityName: 'warehouse',
+    entityLabel: 'Gudang',
+    apiEndpoint: '/api/warehouses',
+    basePath: '/master/warehouse',
+    columns: [
+        { key: 'code', label: 'Kode', width: '120px', sortable: true },
+        { key: 'name', label: 'Nama', sortable: true },
+        { key: 'description', label: 'Deskripsi' },
+        { key: 'is_active', label: 'Status', width: '100px', align: 'center', type: 'status' },
+    ],
+    filters: [
+        { key: 'is_active', label: 'Status', type: 'select', options: [
+            { value: '', label: 'Semua' },
+            { value: '1', label: 'Aktif' },
+            { value: '0', label: 'Nonaktif' },
+        ]},
+    ],
+    permissionPrefix: 'master.inventory.warehouse',
+}, emit);
 </script>
 
 <template>
     <div class="space-y-4">
-        <!-- Toolbar -->
-        <div class="flex items-center justify-between gap-4">
-            <input
-                v-model="filters.search"
-                type="text"
-                placeholder="Cari kode / nama..."
-                class="w-64 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                @input="handleSearch"
+        <div class="rounded-lg bg-white p-4 shadow">
+            <DataTable
+                :columns="columns"
+                :data="data"
+                :loading="loading"
+                :searchable="true"
+                :search-value="search"
+                :search-placeholder="searchPlaceholder"
+                :paginated="true"
+                :current-page="currentPage"
+                :per-page="perPage"
+                :total="total"
+                :actions="actions"
+                :create-button="createButton"
+                :delete-dialog="deleteDialog"
+                :delete-loading="isDeleting"
+                :filters="filters"
+                :filter-values="filterValues"
+                :export-config="exportConfig"
+                :export-loading="isExporting"
+                @search="handleSearch"
+                @update:current-page="currentPage = $event; fetchData()"
+                @update:per-page="perPage = $event; currentPage = 1; fetchData()"
+                @update:filter-values="handleFilterUpdate"
+                @filter="handleFilter"
+                @filter-reset="handleFilterReset"
+                @export-excel="handleExportExcel"
+                @export-pdf="handleExportPdf"
+                @row-click="navigateToView"
+                @action-view="navigateToView"
+                @action-edit="navigateToEdit"
+                @create="navigateToCreate"
+                @delete-confirm="handleDelete"
             />
-            <button
-                type="button"
-                class="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-                @click="handleCreate"
-            >
-                + Tambah Gudang
-            </button>
-        </div>
-
-        <!-- Table -->
-        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Kode</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Nama</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                    <tr v-if="loading">
-                        <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500">Memuat...</td>
-                    </tr>
-                    <tr v-else-if="rows.length === 0">
-                        <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500">Tidak ada data</td>
-                    </tr>
-                    <tr
-                        v-for="row in rows"
-                        v-else
-                        :key="row.id"
-                        class="cursor-pointer hover:bg-gray-50"
-                        @click="handleRowClick(row)"
-                    >
-                        <td class="px-4 py-2.5 text-sm font-medium text-gray-900">{{ row.code }}</td>
-                        <td class="px-4 py-2.5 text-sm text-gray-700">{{ row.name }}</td>
-                        <td class="px-4 py-2.5 text-sm">
-                            <span
-                                class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                                :class="row.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-                            >
-                                {{ row.is_active ? 'Aktif' : 'Tidak Aktif' }}
-                            </span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Pagination -->
-        <div v-if="meta.last_page > 1" class="flex items-center justify-between text-sm text-gray-600">
-            <span>{{ meta.total }} data</span>
-            <div class="flex gap-2">
-                <button :disabled="meta.current_page <= 1" class="rounded border px-3 py-1 disabled:opacity-40" @click="handlePageChange(meta.current_page - 1)">‹</button>
-                <span>{{ meta.current_page }} / {{ meta.last_page }}</span>
-                <button :disabled="meta.current_page >= meta.last_page" class="rounded border px-3 py-1 disabled:opacity-40" @click="handlePageChange(meta.current_page + 1)">›</button>
-            </div>
         </div>
     </div>
 </template>

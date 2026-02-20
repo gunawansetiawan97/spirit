@@ -20,11 +20,13 @@ interface PageAction {
 export const useUiStore = defineStore('ui', () => {
     const sidebarCollapsed = ref(false);
     const sidebarMobileOpen = ref(false);
+    const currentRoute = ref(window.location.pathname || '/dashboard');
     const currentBranch = ref<Branch | null>(null);
     const availableBranches = ref<Branch[]>([]);
     const pageTitle = ref('');
     const pageActions = ref<PageAction[]>([]);
     const isLoadingBranches = ref(false);
+    const formIsOpen = ref(false);
 
     const toggleSidebar = () => {
         sidebarCollapsed.value = !sidebarCollapsed.value;
@@ -55,6 +57,7 @@ export const useUiStore = defineStore('ui', () => {
             const response = await axios.post('/api/switch-branch', { branch_id: branchId });
             currentBranch.value = response.data.data.branch;
             localStorage.setItem('currentBranchId', String(branchId));
+            axios.defaults.headers.common['X-Branch-ID'] = String(branchId);
             return true;
         } catch (error) {
             console.error('Failed to switch branch:', error);
@@ -66,6 +69,9 @@ export const useUiStore = defineStore('ui', () => {
         currentBranch.value = branch;
         if (branch) {
             localStorage.setItem('currentBranchId', String(branch.id));
+            axios.defaults.headers.common['X-Branch-ID'] = String(branch.id);
+        } else {
+            delete axios.defaults.headers.common['X-Branch-ID'];
         }
     };
 
@@ -74,12 +80,20 @@ export const useUiStore = defineStore('ui', () => {
         document.title = title ? `${title} - Spirit ERP` : 'Spirit ERP';
     };
 
+    const setCurrentRoute = (route: string) => {
+        currentRoute.value = route;
+    };
+
     const setPageActions = (actions: PageAction[]) => {
         pageActions.value = actions;
     };
 
     const clearPageActions = () => {
         pageActions.value = [];
+    };
+
+    const setFormOpen = (open: boolean) => {
+        formIsOpen.value = open;
     };
 
     // Initialize from localStorage
@@ -91,18 +105,22 @@ export const useUiStore = defineStore('ui', () => {
     return {
         sidebarCollapsed,
         sidebarMobileOpen,
+        currentRoute,
         currentBranch,
         availableBranches,
         pageTitle,
         pageActions,
         isLoadingBranches,
+        formIsOpen,
         toggleSidebar,
         toggleMobileSidebar,
         closeMobileSidebar,
         fetchBranches,
         switchBranch,
         setCurrentBranch,
+        setCurrentRoute,
         setPageTitle,
+        setFormOpen,
         setPageActions,
         clearPageActions,
     };
